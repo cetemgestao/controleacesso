@@ -3,173 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle de Chaves - Laboratório</title>
+    <title>Sistema de Chaves - Laboratório</title>
     <style>
-        /* Estilos visuais para deixar o aplicativo com cara de app de celular */
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; text-align: center; }
-        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h2 { color: #333; }
-        input, textarea { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
-        button { width: 95%; padding: 15px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin-top: 10px; font-weight: bold; }
-        .btn-verde { background-color: #28a745; color: white; }
-        .btn-vermelho { background-color: #dc3545; color: white; }
-        .btn-azul { background-color: #007bff; color: white; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { max-width: 400px; width: 100%; background: white; padding: 30px 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
+        h2 { color: #1a73e8; margin-bottom: 10px; }
+        p { color: #5f6368; line-height: 1.5; }
+        input, textarea { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #dadce0; border-radius: 8px; font-size: 16px; }
+        button { width: 95%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; font-weight: bold; transition: 0.3s; }
+        .btn-azul { background-color: #1a73e8; color: white; }
+        .btn-verde { background-color: #34a853; color: white; }
+        .btn-vermelho { background-color: #ea4335; color: white; }
         .escondido { display: none; }
-        .alerta-erro { color: #dc3545; font-weight: bold; margin: 15px 0; }
-        .alerta-sucesso { color: #28a745; font-weight: bold; margin: 15px 0; font-size: 20px; }
+        .nome-destaque { color: #1a73e8; font-weight: bold; font-size: 22px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-
     <div id="telaLogin" class="escondido">
-        <h2>Acesso ao Laboratório</h2>
-        <p>Identifique-se para acessar a chave.</p>
-        <input type="text" id="inputMatricula" placeholder="Digite sua Matrícula">
-        <input type="password" id="inputSenha" placeholder="Senha">
+        <h2>Acesso Instrutor</h2>
+        <p>Identifique-se para liberar o laboratório.</p>
+        <input type="text" id="inputMatricula" placeholder="Matrícula">
         <button class="btn-azul" onclick="fazerLogin()">Entrar</button>
     </div>
 
     <div id="telaCarregando" class="escondido">
-        <h2>Aguarde...</h2>
-        <p>Verificando o sistema...</p>
+        <h2>Processando...</h2>
+        <p>Verificando sua reserva...</p>
     </div>
 
     <div id="telaSemReserva" class="escondido">
-        <div class="alerta-erro">Você não fez a reserva do laboratório.</div>
-        <button class="btn-azul" onclick="abrirReserva()">Fazer Reserva Agora</button>
-        <button class="btn-vermelho" onclick="deslogar()">Sair</button>
+        <h2 style="color: #ea4335;">Acesso Negado</h2>
+        <p>Não encontramos uma reserva ativa para sua matrícula.</p>
+        <button class="btn-azul" onclick="window.location.href='LINK_DO_SEU_FORMS'">Fazer Reserva</button>
+        <button class="btn-vermelho" onclick="deslogar()">Tentar outro Login</button>
     </div>
 
     <div id="telaUso" class="escondido">
-        <div class="alerta-sucesso">Você já pode utilizar o laboratório!</div>
-        <p>Sua entrada foi registrada.</p>
-        <p>Quando terminar, bipe o QR Code novamente para devolver.</p>
+        <p>Olá,</p>
+        <div id="exibirNome" class="nome-destaque"></div>
+        <h2 style="color: #34a853;">Liberado!</h2>
+        <p>Sua entrada foi registrada. Lembre-se de conferir os equipamentos.</p>
     </div>
 
     <div id="telaDevolucao" class="escondido">
-        <h2>Devolução da Chave</h2>
-        <p>Está tudo sem alteração? Confirma que fez a análise da quantidade dos equipamentos?</p>
-        <button class="btn-verde" onclick="devolverSim()">SIM, tudo certo</button>
-        <button class="btn-vermelho" onclick="devolverNao()">NÃO, há problemas</button>
+        <p>Olá, <span id="nomeNaDevolucao" style="font-weight:bold;"></span></p>
+        <h2>Finalizar Uso</h2>
+        <p>Está tudo sem alteração nos equipamentos da sala?</p>
+        <button class="btn-verde" onclick="enviarDadosDevolucao('Tudo OK')">SIM, tudo certo</button>
+        <button class="btn-vermelho" onclick="mostrarRelato()">NÃO, há divergências</button>
     </div>
 
     <div id="telaRelato" class="escondido">
-        <h2>Relatar Problema</h2>
-        <p>Descreva o que está faltando ou danificado:</p>
-        <textarea id="textoRelato" rows="4" placeholder="Ex: Falta um multímetro na bancada 2..."></textarea>
-        <button class="btn-vermelho" onclick="enviarRelato()">Enviar Relato e Finalizar</button>
+        <h2>Relatar Ocorrência</h2>
+        <textarea id="textoRelato" rows="4" placeholder="O que aconteceu?"></textarea>
+        <button class="btn-vermelho" onclick="finalizarComRelato()">Enviar e Finalizar</button>
     </div>
-
 </div>
 
 <script>
-    // ELEMENTOS DA TELA
-    const telas = ['telaLogin', 'telaCarregando', 'telaSemReserva', 'telaUso', 'telaDevolucao', 'telaRelato'];
+    const URL_API = "SUA_URL_DO_DEPLOY_AQUI"; // <--- COLE SUA URL AQUI
 
-    // Função para mostrar apenas uma tela e esconder as outras
-    function mostrarTela(telaId) {
-        telas.forEach(id => document.getElementById(id).classList.add('escondido'));
-        document.getElementById(telaId).classList.remove('escondido');
+    function mostrarTela(id) {
+        ['telaLogin', 'telaCarregando', 'telaSemReserva', 'telaUso', 'telaDevolucao', 'telaRelato'].forEach(t => {
+            document.getElementById(t).classList.add('escondido');
+        });
+        document.getElementById(id).classList.remove('escondido');
     }
 
-    // INICIALIZAÇÃO: O que acontece quando a página abre após bipar o QR Code
     window.onload = function() {
         let matricula = localStorage.getItem("matriculaLab");
-        let status = localStorage.getItem("statusLab"); // Sabe se está "em_uso"
+        let status = localStorage.getItem("statusLab");
+        let nome = localStorage.getItem("nomeLab");
 
         if (!matricula) {
             mostrarTela('telaLogin');
+        } else if (status === "em_uso") {
+            document.getElementById("nomeNaDevolucao").innerText = nome;
+            mostrarTela('telaDevolucao');
         } else {
-            if (status === "em_uso") {
-                // Se já pegou a chave antes, mostra a devolução
-                mostrarTela('telaDevolucao');
-            } else {
-                // Se está logado, mas não pegou a chave ainda, verifica a reserva
-                verificarReservaPlanilha(matricula);
-            }
+            verificarReserva(matricula);
         }
-    }
+    };
 
-    // AÇÃO DE LOGIN
     function fazerLogin() {
-        let matricula = document.getElementById("inputMatricula").value;
-        if(matricula === "") {
-            alert("Por favor, digite a matrícula.");
-            return;
-        }
-        
-        // Salva a matrícula no celular
-        localStorage.setItem("matriculaLab", matricula);
-        verificarReservaPlanilha(matricula);
+        let m = document.getElementById("inputMatricula").value;
+        if (!m) return alert("Digite a matrícula");
+        localStorage.setItem("matriculaLab", m);
+        verificarReserva(m);
     }
 
-    // AÇÃO DE VERIFICAR RESERVA (Simulação antes de conectar ao Apps Script)
-    function verificarReservaPlanilha(matricula) {
+    function verificarReserva(m) {
         mostrarTela('telaCarregando');
-
-        // Simulando o tempo de resposta do Google Planilhas (1.5 segundos)
-        setTimeout(() => {
-            // AQUI ENTRARÁ O CÓDIGO DO GOOGLE APPS SCRIPT DEPOIS.
-            // Por enquanto, vamos simular que a reserva deu certo:
-            let temReserva = true; // Mude para 'false' para testar a tela de erro
-
-            if (temReserva) {
-                localStorage.setItem("statusLab", "em_uso"); // Marca que a pessoa pegou a chave
-                mostrarTela('telaUso');
-            } else {
-                mostrarTela('telaSemReserva');
-            }
-        }, 1500);
+        fetch(`${URL_API}?acao=verificar&matricula=${m}`)
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === "sucesso") {
+                    localStorage.setItem("statusLab", "em_uso");
+                    localStorage.setItem("nomeLab", d.nome);
+                    document.getElementById("exibirNome").innerText = d.nome;
+                    mostrarTela('telaUso');
+                } else {
+                    mostrarTela('telaSemReserva');
+                }
+            }).catch(() => alert("Erro ao conectar."));
     }
 
-    // AÇÃO: Clicou em SIM na devolução
-    function devolverSim() {
+    function mostrarRelato() { mostrarTela('telaRelato'); }
+
+    function finalizarComRelato() {
+        let r = document.getElementById("textoRelato").value;
+        if (!r) return alert("Descreva o problema.");
+        enviarDadosDevolucao(r);
+    }
+
+    function enviarDadosDevolucao(relato) {
         mostrarTela('telaCarregando');
-        
-        // Simula envio para a planilha
-        setTimeout(() => {
-            alert("Devolução registrada com sucesso. Obrigado!");
-            deslogar();
-        }, 1000);
-    }
-
-    // AÇÃO: Clicou em NÃO na devolução
-    function devolverNao() {
-        mostrarTela('telaRelato');
-    }
-
-    // AÇÃO: Enviar o relato digitado
-    function enviarRelato() {
-        let relato = document.getElementById("textoRelato").value;
-        if(relato === "") {
-            alert("Por favor, descreva o problema antes de finalizar.");
-            return;
-        }
-
-        mostrarTela('telaCarregando');
-        
-        // Simula envio do texto para a planilha
-        setTimeout(() => {
-            alert("Seu relato foi enviado à coordenação. Sessão finalizada.");
-            deslogar();
-        }, 1500);
-    }
-
-    // FUNÇÕES EXTRAS
-    function abrirReserva() {
-        // Coloque aqui o link do seu formulário de reserva
-        window.location.href = "https://forms.google.com/..."; 
+        let m = localStorage.getItem("matriculaLab");
+        fetch(`${URL_API}?acao=devolver&matricula=${m}&relato=${encodeURIComponent(relato)}`)
+            .then(() => {
+                alert("Finalizado com sucesso!");
+                deslogar();
+            }).catch(() => alert("Erro ao salvar."));
     }
 
     function deslogar() {
-        // Limpa a memória do celular e recarrega a página
-        localStorage.removeItem("matriculaLab");
-        localStorage.removeItem("statusLab");
-        location.reload(); 
+        localStorage.clear();
+        location.reload();
     }
 </script>
-
 </body>
 </html>
