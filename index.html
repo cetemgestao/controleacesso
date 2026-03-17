@@ -3,120 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Controle de Laboratórios - SENAI</title>
+    <title>SENAI - Controle de Acesso</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        :root { --azul-senai: #005696; --vermelho: #ed1c24; --cinza: #f4f4f4; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--cinza); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-        img.logo { width: 180px; margin-bottom: 20px; }
-        h2 { color: var(--azul-senai); margin-bottom: 5px; }
-        p.sala-info { font-weight: bold; color: var(--vermelho); margin-bottom: 20px; }
-        
-        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
-        button { background-color: var(--azul-senai); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:hover { background-color: #003d6b; }
-        button.btn-reserva { background-color: white; color: var(--azul-senai); border: 2px solid var(--azul-senai); margin-top: 15px; }
-        
+        :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f0f2f5; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--fundo); display: flex; justify-content: center; padding: 20px; }
+        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 380px; text-align: center; }
+        .logo { width: 150px; margin-bottom: 20px; }
+        input, select, textarea, button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; box-sizing: border-box; }
+        button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { opacity: 0.9; }
+        .btn-saida { background: var(--vermelho); }
+        .btn-link { background: none; color: var(--azul); border: none; text-decoration: underline; font-size: 14px; cursor: pointer; }
         .hidden { display: none; }
-        .loading { color: #666; font-style: italic; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/8/8c/SENAI_Logo.png" alt="Logo SENAI" class="logo">
-        
-        <div id="tela-login">
-            <h2>Acesso ao Laboratório</h2>
-            <p id="info-sala" class="sala-info">Carregando sala...</p>
-            <input type="text" id="matricula" placeholder="Digite sua Matrícula">
-            <button onclick="verificarAcesso()">LIBERAR ENTRADA</button>
-            <button class="btn-reserva" onclick="mostrarTelaReserva()">FAZER NOVA RESERVA</button>
-        </div>
+<div class="card">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8c/SENAI_Logo.png" class="logo">
+    <h3 id="txt-sala" style="color: var(--vermelho); margin-top: 0;"></h3>
 
-        <div id="tela-reserva" class="hidden">
-            <h2>Nova Reserva</h2>
-            <input type="text" id="res-nome" placeholder="Seu Nome Completo">
-            <input type="text" id="res-matricula" placeholder="Sua Matrícula">
-            <select id="res-sala">
-                <option value="">Selecione a Sala</option>
-                <option value="B5">B5 - Informática</option>
-                <option value="C7">C7 - Comandos</option>
-                <option value="SEP">SEP - Oficina</option>
-            </select>
-            <input type="date" id="res-data">
-            <select id="res-turno">
-                <option value="Manhã">Manhã</option>
-                <option value="Tarde">Tarde</option>
-                <option value="Noite">Noite</option>
-            </select>
-            <button onclick="salvarReserva()">CONFIRMAR RESERVA</button>
-            <button class="btn-reserva" onclick="voltarLogin()">VOLTAR</button>
-        </div>
+    <div id="tela-login">
+        <input type="text" id="matricula" placeholder="Digite sua Matrícula">
+        <button onclick="entrar()">LIBERAR ENTRADA</button>
+        <button class="btn-link" onclick="mostrar('tela-reserva')">Não tem reserva? Clique aqui</button>
     </div>
 
-    <script>
-        // CONFIGURAÇÃO: COLOQUE O SEU LINK DA API AQUI
-        const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
+    <div id="tela-devolucao" class="hidden">
+        <h2 style="color: var(--azul)">Sessão Ativa</h2>
+        <p>Você está no laboratório. Relate qualquer problema abaixo antes de sair:</p>
+        <textarea id="relato" placeholder="Ex: Equipamento com defeito, sala limpa..."></textarea>
+        <button class="btn-saida" onclick="sair()">DEVOLVER CHAVE E SAIR</button>
+    </div>
 
-        // Pega a sala pela URL (ex: ?sala=B5)
-        const params = new URLSearchParams(window.location.search);
-        const salaAtual = params.get('sala') || "Não identificada";
-        document.getElementById('info-sala').innerText = "Laboratório: " + salaAtual;
+    <div id="tela-reserva" class="hidden">
+        <h2>Nova Reserva</h2>
+        <input type="text" id="res-nome" placeholder="Seu Nome">
+        <input type="text" id="res-mat" placeholder="Sua Matrícula">
+        <select id="res-sala-select">
+            <option value="B5">B5 - Informática</option>
+            <option value="C7">C7 - Comandos</option>
+            <option value="SEP">SEP - Oficina</option>
+        </select>
+        <input type="date" id="res-data">
+        <button onclick="reservar()">GRAVAR RESERVA</button>
+        <button class="btn-link" onclick="mostrar('tela-login')">Voltar para Entrada</button>
+    </div>
+</div>
 
-        function verificarAcesso() {
-            const mat = document.getElementById('matricula').value;
-            if(!mat) return alert("Digite a matrícula!");
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
+    const params = new URLSearchParams(window.location.search);
+    const salaAtual = params.get('sala') || "B5";
+    document.getElementById('txt-sala').innerText = "Laboratório " + salaAtual;
 
-            Swal.fire({ title: 'Verificando...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+    let userMat = "";
 
-            fetch(`${API_URL}?acao=verificar&matricula=${mat}&sala=${salaAtual}`)
-                .then(r => r.json())
-                .then(res => {
-                    if(res.status === "sucesso") {
-                        Swal.fire('Acesso Liberado!', `Bem-vindo, ${res.nome}`, 'success');
-                    } else {
-                        Swal.fire('Acesso Negado', res.msg, 'error');
-                    }
-                });
-        }
+    function mostrar(id) {
+        document.getElementById('tela-login').classList.add('hidden');
+        document.getElementById('tela-devolucao').classList.add('hidden');
+        document.getElementById('tela-reserva').classList.add('hidden');
+        document.getElementById(id).classList.remove('hidden');
+    }
 
-        function mostrarTelaReserva() {
-            document.getElementById('tela-login').classList.add('hidden');
-            document.getElementById('tela-reserva').classList.remove('hidden');
-        }
+    function entrar() {
+        userMat = document.getElementById('matricula').value;
+        if(!userMat) return Swal.fire('Erro', 'Insira a matrícula', 'warning');
 
-        function voltarLogin() {
-            document.getElementById('tela-reserva').classList.add('hidden');
-            document.getElementById('tela-login').classList.remove('hidden');
-        }
+        Swal.fire({title: 'Consultando...', didOpen: () => Swal.showLoading()});
 
-        function salvarReserva() {
-            const nome = document.getElementById('res-nome').value;
-            const mat = document.getElementById('res-matricula').value;
-            const sala = document.getElementById('res-sala').value;
-            const dataRaw = document.getElementById('res-data').value; // yyyy-mm-dd
-            const turno = document.getElementById('res-turno').value;
+        fetch(`${API_URL}?acao=verificar&matricula=${userMat}&sala=${salaAtual}`)
+        .then(r => r.json()).then(res => {
+            if(res.status === "sucesso") {
+                Swal.fire('Liberado!', 'Entrada registrada.', 'success');
+                mostrar('tela-devolucao');
+            } else if(res.status === "ja_logado") {
+                Swal.fire('Sessão Aberta', 'Você já iniciou a entrada anteriormente.', 'info');
+                mostrar('tela-devolucao');
+            } else {
+                Swal.fire('Negado', res.msg, 'error');
+            }
+        });
+    }
 
-            if(!nome || !mat || !sala || !dataRaw) return alert("Preencha tudo!");
+    function sair() {
+        const obs = document.getElementById('relato').value;
+        Swal.fire({title: 'Registrando saída...', didOpen: () => Swal.showLoading()});
 
-            // Converte data para DD/MM/YYYY para o Google Sheets
-            const dataSplit = dataRaw.split("-");
-            const dataFormatada = `${dataSplit[2]}/${dataSplit[1]}/${dataSplit[0]}`;
+        fetch(`${API_URL}?acao=devolver&matricula=${userMat}&sala=${salaAtual}&relato=${obs}`)
+        .then(r => r.json()).then(() => {
+            Swal.fire('Finalizado!', 'Chave devolvida.', 'success').then(() => location.reload());
+        });
+    }
 
-            Swal.fire({ title: 'Salvando reserva...', didOpen: () => { Swal.showLoading() } });
+    function reservar() {
+        const nome = document.getElementById('res-nome').value;
+        const mat = document.getElementById('res-mat').value;
+        const sala = document.getElementById('res-sala-select').value;
+        const dataRaw = document.getElementById('res-data').value;
+        
+        if(!nome || !mat || !dataRaw) return alert("Preencha tudo");
+        const [y, m, d] = dataRaw.split("-");
+        const dataF = `${d}/${m}/${y}`;
 
-            fetch(`${API_URL}?acao=reservar&nome=${nome}&matricula=${mat}&sala=${sala}&data=${dataFormatada}&turno=${turno}`)
-                .then(r => r.json())
-                .then(res => {
-                    if(res.status === "sucesso") {
-                        Swal.fire('Sucesso!', 'Reserva gravada no sistema.', 'success').then(() => voltarLogin());
-                    } else {
-                        Swal.fire('Erro', 'Não foi possível salvar.', 'error');
-                    }
-                });
-        }
-    </script>
+        fetch(`${API_URL}?acao=reservar&nome=${nome}&matricula=${mat}&sala=${sala}&data=${dataF}&turno=Manual`)
+        .then(r => r.json()).then(() => {
+            Swal.fire('Reservado!', 'Sua reserva foi gravada.', 'success').then(() => mostrar('tela-login'));
+        });
+    }
+</script>
 </body>
 </html>
