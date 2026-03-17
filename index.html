@@ -3,134 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Chaves - Laboratório</title>
+    <title>Sistema de Chaves SENAI</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .container { max-width: 400px; width: 100%; background: white; padding: 30px 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
-        h2 { color: #1a73e8; margin-bottom: 10px; }
-        p { color: #5f6368; line-height: 1.5; }
-        input, textarea { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #dadce0; border-radius: 8px; font-size: 16px; }
-        button { width: 95%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; font-weight: bold; transition: 0.3s; }
-        .btn-azul { background-color: #1a73e8; color: white; }
-        .btn-verde { background-color: #34a853; color: white; }
-        .btn-vermelho { background-color: #ea4335; color: white; }
+        body { font-family: sans-serif; background-color: #f0f2f5; text-align: center; padding: 20px; }
+        .container { max-width: 400px; background: white; padding: 20px; border-radius: 15px; margin: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .btn { width: 100%; padding: 15px; margin-top: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-azul { background: #1a73e8; color: white; }
+        .btn-verde { background: #34a853; color: white; }
+        .btn-vermelho { background: #ea4335; color: white; }
         .escondido { display: none; }
-        .nome-destaque { color: #1a73e8; font-weight: bold; font-size: 22px; }
+        input, textarea { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; }
     </style>
 </head>
 <body>
-
 <div class="container">
+    <div id="statusSala" style="font-weight: bold; color: #555; margin-bottom: 10px;"></div>
+
     <div id="telaLogin" class="escondido">
-        <h2>Acesso Instrutor</h2>
-        <p>Identifique-se para liberar o laboratório.</p>
-        <input type="text" id="inputMatricula" placeholder="Matrícula">
-        <button class="btn-azul" onclick="fazerLogin()">Entrar</button>
+        <h2>Identificação</h2>
+        <input type="text" id="inputMatricula" placeholder="Digite sua Matrícula">
+        <button class="btn btn-azul" onclick="fazerLogin()">Entrar</button>
     </div>
 
-    <div id="telaCarregando" class="escondido">
-        <h2>Processando...</h2>
-        <p>Verificando sua reserva...</p>
-    </div>
-
-    <div id="telaSemReserva" class="escondido">
-        <h2 style="color: #ea4335;">Acesso Negado</h2>
-        <p>Não encontramos uma reserva ativa para sua matrícula.</p>
-        <button class="btn-azul" onclick="window.location.href='LINK_DO_SEU_FORMS'">Fazer Reserva</button>
-        <button class="btn-vermelho" onclick="deslogar()">Tentar outro Login</button>
-    </div>
+    <div id="telaCarregando" class="escondido"><h2>Aguarde...</h2><p>Consultando reservas...</p></div>
 
     <div id="telaUso" class="escondido">
-        <p>Olá,</p>
-        <div id="exibirNome" class="nome-destaque"></div>
-        <h2 style="color: #34a853;">Liberado!</h2>
-        <p>Sua entrada foi registrada. Lembre-se de conferir os equipamentos.</p>
+        <p>Olá, <span id="nomeInstrutor" style="font-weight:bold; color:#1a73e8;"></span></p>
+        <h2 style="color: #34a853;">Acesso Liberado!</h2>
+        <p>A sua entrada foi registada.</p>
     </div>
 
     <div id="telaDevolucao" class="escondido">
-        <p>Olá, <span id="nomeNaDevolucao" style="font-weight:bold;"></span></p>
-        <h2>Finalizar Uso</h2>
-        <p>Está tudo sem alteração nos equipamentos da sala?</p>
-        <button class="btn-verde" onclick="enviarDadosDevolucao('Tudo OK')">SIM, tudo certo</button>
-        <button class="btn-vermelho" onclick="mostrarRelato()">NÃO, há divergências</button>
+        <h2>Devolver Chave</h2>
+        <p>Confirmas que todos os equipamentos estão na sala?</p>
+        <button class="btn btn-verde" onclick="enviarDevolucao('Tudo OK')">SIM, está tudo OK</button>
+        <button class="btn btn-vermelho" onclick="mostrarRelato()">NÃO, algo aconteceu</button>
     </div>
 
     <div id="telaRelato" class="escondido">
-        <h2>Relatar Ocorrência</h2>
-        <textarea id="textoRelato" rows="4" placeholder="O que aconteceu?"></textarea>
-        <button class="btn-vermelho" onclick="finalizarComRelato()">Enviar e Finalizar</button>
+        <textarea id="textoRelato" rows="4" placeholder="Descreva o problema..."></textarea>
+        <button class="btn btn-vermelho" onclick="enviarRelato()">Enviar e Finalizar</button>
     </div>
 </div>
 
 <script>
-    const URL_API = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec"; // <--- COLE SUA URL AQUI
+    const URL_API = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec"; 
+    const urlParams = new URLSearchParams(window.location.search);
+    const salaAtual = urlParams.get('sala') || "Desconhecida";
 
     function mostrarTela(id) {
-        ['telaLogin', 'telaCarregando', 'telaSemReserva', 'telaUso', 'telaDevolucao', 'telaRelato'].forEach(t => {
-            document.getElementById(t).classList.add('escondido');
-        });
+        ['telaLogin','telaCarregando','telaUso','telaDevolucao','telaRelato'].forEach(t => document.getElementById(t).classList.add('escondido'));
         document.getElementById(id).classList.remove('escondido');
     }
 
     window.onload = function() {
-        let matricula = localStorage.getItem("matriculaLab");
-        let status = localStorage.getItem("statusLab");
-        let nome = localStorage.getItem("nomeLab");
-
-        if (!matricula) {
-            mostrarTela('telaLogin');
-        } else if (status === "em_uso") {
-            document.getElementById("nomeNaDevolucao").innerText = nome;
-            mostrarTela('telaDevolucao');
-        } else {
-            verificarReserva(matricula);
-        }
+        document.getElementById("statusSala").innerText = "Laboratório: " + salaAtual;
+        let m = localStorage.getItem("matLab");
+        if (!m) mostrarTela('telaLogin');
+        else if (localStorage.getItem("status") === "em_uso") mostrarTela('telaDevolucao');
+        else verificar(m);
     };
 
     function fazerLogin() {
         let m = document.getElementById("inputMatricula").value;
         if (!m) return alert("Digite a matrícula");
-        localStorage.setItem("matriculaLab", m);
-        verificarReserva(m);
+        localStorage.setItem("matLab", m);
+        verificar(m);
     }
 
-    function verificarReserva(m) {
+    function verificar(m) {
         mostrarTela('telaCarregando');
-        fetch(`${URL_API}?acao=verificar&matricula=${m}`)
-            .then(r => r.json())
-            .then(d => {
+        fetch(`${URL_API}?acao=verificar&matricula=${m}&sala=${salaAtual}`)
+            .then(r => r.json()).then(d => {
                 if (d.status === "sucesso") {
-                    localStorage.setItem("statusLab", "em_uso");
-                    localStorage.setItem("nomeLab", d.nome);
-                    document.getElementById("exibirNome").innerText = d.nome;
+                    localStorage.setItem("status", "em_uso");
+                    localStorage.setItem("nome", d.nome);
+                    document.getElementById("nomeInstrutor").innerText = d.nome;
                     mostrarTela('telaUso');
                 } else {
-                    mostrarTela('telaSemReserva');
+                    alert(d.msg || "Sem reserva.");
+                    localStorage.clear();
+                    location.reload();
                 }
-            }).catch(() => alert("Erro ao conectar."));
+            });
     }
 
     function mostrarRelato() { mostrarTela('telaRelato'); }
+    function enviarRelato() { enviarDevolucao(document.getElementById("textoRelato").value); }
 
-    function finalizarComRelato() {
-        let r = document.getElementById("textoRelato").value;
-        if (!r) return alert("Descreva o problema.");
-        enviarDadosDevolucao(r);
-    }
-
-    function enviarDadosDevolucao(relato) {
+    function enviarDevolucao(rel) {
         mostrarTela('telaCarregando');
-        let m = localStorage.getItem("matriculaLab");
-        fetch(`${URL_API}?acao=devolver&matricula=${m}&relato=${encodeURIComponent(relato)}`)
-            .then(() => {
-                alert("Finalizado com sucesso!");
-                deslogar();
-            }).catch(() => alert("Erro ao salvar."));
-    }
-
-    function deslogar() {
-        localStorage.clear();
-        location.reload();
+        let m = localStorage.getItem("matLab");
+        fetch(`${URL_API}?acao=devolver&matricula=${m}&relato=${encodeURIComponent(rel)}`)
+            .then(() => { localStorage.clear(); location.reload(); });
     }
 </script>
 </body>
