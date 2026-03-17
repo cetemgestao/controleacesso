@@ -1,102 +1,122 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Chaves SENAI</title>
+    <title>Sistema de Controle de Laboratórios - SENAI</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        body { font-family: sans-serif; background-color: #f0f2f5; text-align: center; padding: 20px; }
-        .container { max-width: 400px; background: white; padding: 20px; border-radius: 15px; margin: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .btn { width: 100%; padding: 15px; margin-top: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .btn-azul { background: #1a73e8; color: white; }
-        .btn-verde { background: #34a853; color: white; }
-        .btn-vermelho { background: #ea4335; color: white; }
-        .escondido { display: none; }
-        input, textarea { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; }
+        :root { --azul-senai: #005696; --vermelho: #ed1c24; --cinza: #f4f4f4; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--cinza); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        img.logo { width: 180px; margin-bottom: 20px; }
+        h2 { color: var(--azul-senai); margin-bottom: 5px; }
+        p.sala-info { font-weight: bold; color: var(--vermelho); margin-bottom: 20px; }
+        
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
+        button { background-color: var(--azul-senai); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background-color: #003d6b; }
+        button.btn-reserva { background-color: white; color: var(--azul-senai); border: 2px solid var(--azul-senai); margin-top: 15px; }
+        
+        .hidden { display: none; }
+        .loading { color: #666; font-style: italic; }
     </style>
 </head>
 <body>
-<div class="container">
-    <div id="statusSala" style="font-weight: bold; color: #555; margin-bottom: 10px;"></div>
 
-    <div id="telaLogin" class="escondido">
-        <h2>Identificação</h2>
-        <input type="text" id="inputMatricula" placeholder="Digite sua Matrícula">
-        <button class="btn btn-azul" onclick="fazerLogin()">Entrar</button>
+    <div class="container">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/8/8c/SENAI_Logo.png" alt="Logo SENAI" class="logo">
+        
+        <div id="tela-login">
+            <h2>Acesso ao Laboratório</h2>
+            <p id="info-sala" class="sala-info">Carregando sala...</p>
+            <input type="text" id="matricula" placeholder="Digite sua Matrícula">
+            <button onclick="verificarAcesso()">LIBERAR ENTRADA</button>
+            <button class="btn-reserva" onclick="mostrarTelaReserva()">FAZER NOVA RESERVA</button>
+        </div>
+
+        <div id="tela-reserva" class="hidden">
+            <h2>Nova Reserva</h2>
+            <input type="text" id="res-nome" placeholder="Seu Nome Completo">
+            <input type="text" id="res-matricula" placeholder="Sua Matrícula">
+            <select id="res-sala">
+                <option value="">Selecione a Sala</option>
+                <option value="B5">B5 - Informática</option>
+                <option value="C7">C7 - Comandos</option>
+                <option value="SEP">SEP - Oficina</option>
+            </select>
+            <input type="date" id="res-data">
+            <select id="res-turno">
+                <option value="Manhã">Manhã</option>
+                <option value="Tarde">Tarde</option>
+                <option value="Noite">Noite</option>
+            </select>
+            <button onclick="salvarReserva()">CONFIRMAR RESERVA</button>
+            <button class="btn-reserva" onclick="voltarLogin()">VOLTAR</button>
+        </div>
     </div>
 
-    <div id="telaCarregando" class="escondido"><h2>Aguarde...</h2><p>Consultando reservas...</p></div>
+    <script>
+        // CONFIGURAÇÃO: COLOQUE O SEU LINK DA API AQUI
+        const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
 
-    <div id="telaUso" class="escondido">
-        <p>Olá, <span id="nomeInstrutor" style="font-weight:bold; color:#1a73e8;"></span></p>
-        <h2 style="color: #34a853;">Acesso Liberado!</h2>
-        <p>A sua entrada foi registada.</p>
-    </div>
+        // Pega a sala pela URL (ex: ?sala=B5)
+        const params = new URLSearchParams(window.location.search);
+        const salaAtual = params.get('sala') || "Não identificada";
+        document.getElementById('info-sala').innerText = "Laboratório: " + salaAtual;
 
-    <div id="telaDevolucao" class="escondido">
-        <h2>Devolver Chave</h2>
-        <p>Confirmas que todos os equipamentos estão na sala?</p>
-        <button class="btn btn-verde" onclick="enviarDevolucao('Tudo OK')">SIM, está tudo OK</button>
-        <button class="btn btn-vermelho" onclick="mostrarRelato()">NÃO, algo aconteceu</button>
-    </div>
+        function verificarAcesso() {
+            const mat = document.getElementById('matricula').value;
+            if(!mat) return alert("Digite a matrícula!");
 
-    <div id="telaRelato" class="escondido">
-        <textarea id="textoRelato" rows="4" placeholder="Descreva o problema..."></textarea>
-        <button class="btn btn-vermelho" onclick="enviarRelato()">Enviar e Finalizar</button>
-    </div>
-</div>
+            Swal.fire({ title: 'Verificando...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
 
-<script>
-    const URL_API = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec"; 
-    const urlParams = new URLSearchParams(window.location.search);
-    const salaAtual = urlParams.get('sala') || "Desconhecida";
+            fetch(`${API_URL}?acao=verificar&matricula=${mat}&sala=${salaAtual}`)
+                .then(r => r.json())
+                .then(res => {
+                    if(res.status === "sucesso") {
+                        Swal.fire('Acesso Liberado!', `Bem-vindo, ${res.nome}`, 'success');
+                    } else {
+                        Swal.fire('Acesso Negado', res.msg, 'error');
+                    }
+                });
+        }
 
-    function mostrarTela(id) {
-        ['telaLogin','telaCarregando','telaUso','telaDevolucao','telaRelato'].forEach(t => document.getElementById(t).classList.add('escondido'));
-        document.getElementById(id).classList.remove('escondido');
-    }
+        function mostrarTelaReserva() {
+            document.getElementById('tela-login').classList.add('hidden');
+            document.getElementById('tela-reserva').classList.remove('hidden');
+        }
 
-    window.onload = function() {
-        document.getElementById("statusSala").innerText = "Laboratório: " + salaAtual;
-        let m = localStorage.getItem("matLab");
-        if (!m) mostrarTela('telaLogin');
-        else if (localStorage.getItem("status") === "em_uso") mostrarTela('telaDevolucao');
-        else verificar(m);
-    };
+        function voltarLogin() {
+            document.getElementById('tela-reserva').classList.add('hidden');
+            document.getElementById('tela-login').classList.remove('hidden');
+        }
 
-    function fazerLogin() {
-        let m = document.getElementById("inputMatricula").value;
-        if (!m) return alert("Digite a matrícula");
-        localStorage.setItem("matLab", m);
-        verificar(m);
-    }
+        function salvarReserva() {
+            const nome = document.getElementById('res-nome').value;
+            const mat = document.getElementById('res-matricula').value;
+            const sala = document.getElementById('res-sala').value;
+            const dataRaw = document.getElementById('res-data').value; // yyyy-mm-dd
+            const turno = document.getElementById('res-turno').value;
 
-    function verificar(m) {
-        mostrarTela('telaCarregando');
-        fetch(`${URL_API}?acao=verificar&matricula=${m}&sala=${salaAtual}`)
-            .then(r => r.json()).then(d => {
-                if (d.status === "sucesso") {
-                    localStorage.setItem("status", "em_uso");
-                    localStorage.setItem("nome", d.nome);
-                    document.getElementById("nomeInstrutor").innerText = d.nome;
-                    mostrarTela('telaUso');
-                } else {
-                    alert(d.msg || "Sem reserva.");
-                    localStorage.clear();
-                    location.reload();
-                }
-            });
-    }
+            if(!nome || !mat || !sala || !dataRaw) return alert("Preencha tudo!");
 
-    function mostrarRelato() { mostrarTela('telaRelato'); }
-    function enviarRelato() { enviarDevolucao(document.getElementById("textoRelato").value); }
+            // Converte data para DD/MM/YYYY para o Google Sheets
+            const dataSplit = dataRaw.split("-");
+            const dataFormatada = `${dataSplit[2]}/${dataSplit[1]}/${dataSplit[0]}`;
 
-    function enviarDevolucao(rel) {
-        mostrarTela('telaCarregando');
-        let m = localStorage.getItem("matLab");
-        fetch(`${URL_API}?acao=devolver&matricula=${m}&relato=${encodeURIComponent(rel)}`)
-            .then(() => { localStorage.clear(); location.reload(); });
-    }
-</script>
+            Swal.fire({ title: 'Salvando reserva...', didOpen: () => { Swal.showLoading() } });
+
+            fetch(`${API_URL}?acao=reservar&nome=${nome}&matricula=${mat}&sala=${sala}&data=${dataFormatada}&turno=${turno}`)
+                .then(r => r.json())
+                .then(res => {
+                    if(res.status === "sucesso") {
+                        Swal.fire('Sucesso!', 'Reserva gravada no sistema.', 'success').then(() => voltarLogin());
+                    } else {
+                        Swal.fire('Erro', 'Não foi possível salvar.', 'error');
+                    }
+                });
+        }
+    </script>
 </body>
 </html>
