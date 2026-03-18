@@ -7,27 +7,22 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f4f7f6; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--fundo); padding: 10px; margin: 0; display: flex; justify-content: center; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--fundo); padding: 10px; margin: 0; display: flex; justify-content: center; }
         .card { background: white; padding: 20px; border-radius: 12px; max-width: 600px; width: 100%; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
-        input, select, button { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; box-sizing: border-box; }
-        button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:hover { opacity: 0.9; }
+        input, select, button, textarea { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; box-sizing: border-box; }
+        button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; }
         .hidden { display: none; }
-        
         .calendario-container { margin-top: 15px; overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
         .tabela-grade { width: 100%; border-collapse: collapse; min-width: 500px; }
-        .tabela-grade th, .tabela-grade td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 13px; }
-        .tabela-grade th { background: #f0f0f0; color: #333; }
-        .tabela-grade td.turno-label { font-weight: bold; background: #fafafa; color: var(--azul); width: 60px; }
-        
-        .celula-livre { background: white; cursor: pointer; transition: 0.2s; }
-        .celula-livre:hover { background: #eef5ff; }
-        .celula-selecionada { background: #b3d4ff !important; font-weight: bold; color: var(--azul); border: 2px solid var(--azul) !important; cursor: pointer; }
-        .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; cursor: not-allowed; font-size: 11px; }
-        
-        .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); font-size: 18px; text-transform: uppercase; }
-        .nav-semana button { width: auto; padding: 5px 15px; margin: 0; font-size: 18px; }
-        .aviso-qr { color: #666; font-size: 14px; margin: 15px 0; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; }
+        .tabela-grade th, .tabela-grade td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 12px; }
+        .tabela-grade th { background: #f0f0f0; }
+        .turno-label { font-weight: bold; background: #fafafa; color: var(--azul); width: 60px; }
+        .celula-livre { background: white; cursor: pointer; }
+        .celula-selecionada { background: #b3d4ff !important; color: var(--azul); font-weight: bold; border: 2px solid var(--azul) !important; }
+        .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; font-size: 10px; }
+        .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); }
+        .nav-semana button { width: auto; padding: 5px 15px; margin: 0; }
+        .aviso-qr { color: #666; font-size: 13px; margin: 10px 0; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; }
     </style>
 </head>
 <body>
@@ -38,7 +33,7 @@
 
     <div id="tela-login">
         <div id="aviso-qr" class="aviso-qr hidden">
-            📍 Central de Reservas<br><span style="font-size:12px;">Para destravar a porta, utilize a câmera do celular no QR Code do laboratório.</span>
+            📍 Central de Reservas<br>Leia o QR Code na porta do laboratório para registrar entrada.
         </div>
         <input type="text" id="mat-login" placeholder="Sua Matrícula">
         <button id="btn-entrar" onclick="entrar()">ENTRAR NO LAB</button>
@@ -47,8 +42,8 @@
 
     <div id="tela-devolucao" class="hidden">
         <h2 style="color:var(--azul)">Sessão Ativa</h2>
-        <textarea id="relato" placeholder="Relato de uso (opcional)" rows="3" style="width:100%; padding:10px; border-radius:8px; border:1px solid #ccc;"></textarea>
-        <button style="background:var(--vermelho); margin-top:10px;" onclick="sair()">DEVOLVER CHAVE E SAIR</button>
+        <textarea id="relato" placeholder="Relato de uso (opcional)" rows="3"></textarea>
+        <button style="background:var(--vermelho)" onclick="sair()">DEVOLVER CHAVE E SAIR</button>
     </div>
 
     <div id="tela-reserva" class="hidden">
@@ -56,11 +51,7 @@
             <input type="text" id="res-mat" placeholder="Matrícula" oninput="buscarNome()" style="flex: 1;">
             <input type="text" id="res-nome" placeholder="Nome" style="background:#eee; flex: 2;" readonly>
         </div>
-        
-        <select id="res-sala-sel" onchange="carregarAgenda()">
-            <option value="">Carregando salas...</option>
-        </select>
-        
+        <select id="res-sala-sel" onchange="carregarAgenda()"><option value="">Carregando salas...</option></select>
         <div id="area-calendario" class="hidden">
             <div class="nav-semana">
                 <button onclick="mudarSemana(-1)">&#9664;</button>
@@ -73,44 +64,36 @@
                     <tbody id="grade-corpo"></tbody>
                 </table>
             </div>
-            <p style="font-size:12px; color:#555; text-align:left; margin-top:5px;">* Clique nos quadros brancos para selecionar.</p>
         </div>
-
         <button onclick="enviarReservas()" style="margin-top:15px;">CONFIRMAR AGENDAMENTOS</button>
         <button style="background:#777" onclick="location.reload()">VOLTAR</button>
     </div>
 </div>
 
 <script>
-    // ======= CONFIGURAÇÃO GViz =======
-    const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U"; // Ex: 1MjfQ5NQ3BvQAWzmIxjoqDBmeQdAn9EREGjqnj2EAR1I
-    const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec"; 
+    const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U";
+    const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
     
     const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
     const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
     const URL_RESERVAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
-    // =================================
     
     const params = new URLSearchParams(window.location.search);
     const salaURL = params.get('sala');
-    
+
+    // CORREÇÃO QR CODE: Só mostra a sala se ela vier no link
     if (salaURL) {
         document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
     } else {
-        document.getElementById('txt-sala').innerText = "Sistema de Reservas";
+        document.getElementById('txt-sala').innerText = "Central de Reservas";
         document.getElementById('mat-login').classList.add('hidden');
         document.getElementById('btn-entrar').classList.add('hidden');
         document.getElementById('aviso-qr').classList.remove('hidden');
     }
     
-    let selecionados = [];
-    let agendaAtual = [];
-    let listaInstrutores = []; 
-    
-    let dataInicioSemana = new Date(); 
-    const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    let selecionados = [], agendaAtual = [], listaInstrutores = [], dataInicioSemana = new Date(); 
+    const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'], turnos = ['Manhã', 'Tarde', 'Noite'];
     const nomeMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-    const turnos = ['Manhã', 'Tarde', 'Noite'];
 
     function mostrar(id) {
         document.querySelectorAll('.card > div').forEach(d => d.classList.add('hidden'));
@@ -120,182 +103,116 @@
     function buscarNome() {
         const mat = document.getElementById('res-mat').value;
         const inputNome = document.getElementById('res-nome');
-        if(mat.length === 0) { inputNome.value = ""; return; }
-        
-        const pessoa = listaInstrutores.find(i => i.mat === mat.toString());
+        if(!mat) { inputNome.value = ""; return; }
+        const pessoa = listaInstrutores.find(i => i.mat == mat);
         inputNome.value = pessoa ? pessoa.nome : "Não encontrado";
     }
 
     async function abrirReserva() {
         mostrar('tela-reserva');
-        Swal.fire({title: 'Acessando Banco de Dados...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
-        
+        Swal.fire({title: 'Acessando dados...', didOpen: () => Swal.showLoading()});
         try {
-            const [resSalas, resInst] = await Promise.all([
+            const [resS, resI] = await Promise.all([
                 fetch(`${URL_SALAS}&t=${Date.now()}`).then(r => r.text()),
                 fetch(`${URL_INSTRUTORES}&t=${Date.now()}`).then(r => r.text())
             ]);
-
-            const jsonInst = JSON.parse(resInst.substring(47).slice(0, -2));
-            if(jsonInst.table.rows.length > 0) {
-                listaInstrutores = jsonInst.table.rows.map(r => {
-                    return { mat: r.c[0]?.v?.toString(), nome: r.c[1]?.v };
-                }).filter(i => i.mat);
-            }
-
-            const jsonSalas = JSON.parse(resSalas.substring(47).slice(0, -2));
+            const jI = JSON.parse(resI.substring(47).slice(0, -2));
+            listaInstrutores = jI.table.rows.map(r => ({ mat: r.c[0]?.v?.toString(), nome: r.c[1]?.v }));
+            const jS = JSON.parse(resS.substring(47).slice(0, -2));
             const sel = document.getElementById('res-sala-sel');
             sel.innerHTML = '<option value="">Selecione a Sala</option>';
-            if(jsonSalas.table.rows.length > 1) {
-                jsonSalas.table.rows.slice(1).forEach(r => {
-                    if(r.c[0]?.v) sel.innerHTML += `<option value="${r.c[0].v}">${r.c[1]?.v}</option>`;
-                });
-            }
-            
-            buscarNome();
-            if(salaURL) { sel.value = salaURL; carregarAgenda(); } 
-            else { Swal.close(); }
-
-        } catch(e) {
-            Swal.fire('Erro', 'Falha ao baixar dados. Verifique o ID da Planilha.', 'error');
-        }
+            jS.table.rows.slice(1).forEach(r => { if(r.c[0]?.v) sel.innerHTML += `<option value="${r.c[0].v}">${r.c[1]?.v}</option>`; });
+            if(salaURL) { sel.value = salaURL; carregarAgenda(); } else { Swal.close(); }
+        } catch(e) { Swal.fire('Erro', 'Planilha não está pública!', 'error'); }
     }
 
     async function carregarAgenda() {
         const sala = document.getElementById('res-sala-sel').value;
-        if(!sala) { document.getElementById('area-calendario').classList.add('hidden'); return; }
-        
+        if(!sala) return;
         document.getElementById('area-calendario').classList.remove('hidden');
-        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8" style="padding:20px; color:#666;">Buscando horários ocupados...</td></tr>';
-        
+        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8">Carregando...</td></tr>';
         try {
-            const querySegura = encodeURIComponent(`select * where B = '${sala}'`);
-            const res = await fetch(`${URL_RESERVAS}&tq=${querySegura}&t=${Date.now()}`).then(r => r.text());
+            const query = encodeURIComponent(`select * where B = '${sala}'`);
+            const res = await fetch(`${URL_RESERVAS}&tq=${query}&t=${Date.now()}`).then(r => r.text());
             const json = JSON.parse(res.substring(47).slice(0, -2));
             
-            agendaAtual = [];
-            if(json.table.rows.length > 0) {
-                agendaAtual = json.table.rows.map(r => {
-                    // O TRADUTOR DE DATAS INDESTRUTÍVEL
-                    let dVal = r.c[0]?.f || r.c[0]?.v || "";
-                    let dLimpa = String(dVal).replace(/['"]/g, "").trim(); // Remove aspas
-                    
-                    // Se vier como Objeto Date do Google (Ex: Date(2026, 2, 18))
-                    if(dLimpa.startsWith("Date(")) {
-                        let pts = dLimpa.match(/Date\((\d+),\s*(\d+),\s*(\d+)/);
-                        if(pts) {
-                            // Mês no JS começa em 0, por isso soma 1
-                            dLimpa = String(pts[3]).padStart(2,'0') + "/" + String(parseInt(pts[2])+1).padStart(2,'0') + "/" + pts[1];
-                        }
-                    } else if (dLimpa.includes("-")) {
-                        // Se vier invertido do GViz (YYYY-MM-DD)
-                        let pts = dLimpa.split("T")[0].split("-");
-                        if(pts.length === 3) dLimpa = `${pts[2]}/${pts[1]}/${pts[0]}`;
-                    }
-
-                    return {
-                        data: dLimpa,
-                        instrutor: r.c[3]?.v ? String(r.c[3].v).split(" ")[0] : "Inst.",
-                        turno: r.c[4]?.v ? String(r.c[4].v).trim() : ""
-                    };
-                }).filter(r => r.data && r.data.includes("/"));
-            }
-
+            agendaAtual = json.table.rows.map(r => {
+                let dRaw = r.c[0]?.f || r.c[0]?.v || "";
+                let dTratada = String(dRaw).replace(/['"]/g, "").trim();
+                
+                // TRADUTOR DE DATA (Resolve o problema de não mostrar)
+                if(dTratada.includes("Date(")) {
+                    let p = dTratada.match(/\d+/g);
+                    dTratada = p[2].padStart(2,'0') + "/" + (parseInt(p[1])+1).toString().padStart(2,'0') + "/" + p[0];
+                } else if(dTratada.includes("-")) {
+                    let p = dTratada.split("-");
+                    dTratada = p[2].padStart(2,'0') + "/" + p[1].padStart(2,'0') + "/" + p[0];
+                }
+                return { data: dTratada, instrutor: r.c[3]?.v ? r.c[3].v.toString().split(" ")[0] : "", turno: r.c[4]?.v?.toString().trim() };
+            });
             renderizarGrade();
-        } catch(e) {
-            Swal.fire('Erro', 'Falha ao carregar a agenda.', 'error');
-        }
-    }
-
-    function mudarSemana(dias) { dataInicioSemana.setDate(dataInicioSemana.getDate() + (dias * 7)); renderizarGrade(); }
-
-    function formatarDataBR(dataObj) {
-        const d = String(dataObj.getDate()).padStart(2, '0');
-        const m = String(dataObj.getMonth() + 1).padStart(2, '0');
-        const y = dataObj.getFullYear();
-        return `${d}/${m}/${y}`;
+        } catch(e) { console.error(e); }
     }
 
     function renderizarGrade() {
-        const cabecalho = document.getElementById('grade-cabecalho');
-        const corpo = document.getElementById('grade-corpo');
-        
-        let datasSemana = [];
-        let htmlCabecalho = '<tr><th>Turno</th>';
-        
-        for(let i = 0; i < 7; i++) {
-            let dataAt = new Date(dataInicioSemana);
-            dataAt.setDate(dataAt.getDate() + i);
-            datasSemana.push(dataAt);
-            htmlCabecalho += `<th>${String(dataAt.getDate()).padStart(2, '0')}/${String(dataAt.getMonth()+1).padStart(2, '0')}<br>${diasSemana[dataAt.getDay()]}</th>`;
+        const cab = document.getElementById('grade-cabecalho'), cor = document.getElementById('grade-corpo');
+        let dSemana = [], hCab = '<tr><th>Turno</th>';
+        for(let i=0; i<7; i++) {
+            let dAt = new Date(dataInicioSemana); dAt.setDate(dAt.getDate() + i); dSemana.push(dAt);
+            hCab += `<th>${String(dAt.getDate()).padStart(2,'0')}/${String(dAt.getMonth()+1).padStart(2,'0')}<br>${diasSemana[dAt.getDay()]}</th>`;
         }
-        htmlCabecalho += '</tr>';
-        cabecalho.innerHTML = htmlCabecalho;
-        
-        document.getElementById('texto-semana').innerText = `${nomeMeses[datasSemana[0].getMonth()]} ${datasSemana[0].getFullYear()}`;
-
-        let htmlCorpo = '';
-        turnos.forEach(turno => {
-            htmlCorpo += `<tr><td class="turno-label">${turno}</td>`;
-            datasSemana.forEach(dataAt => {
-                const dataStr = formatarDataBR(dataAt);
-                const idCelula = `${dataStr}|${turno}`;
-                
-                const reserva = agendaAtual.find(r => r.data === dataStr && r.turno === turno);
-                const isSelecionado = selecionados.includes(idCelula);
-                
-                if (reserva) { htmlCorpo += `<td class="celula-ocupada">X<br>${reserva.instrutor}</td>`; } 
-                else if (isSelecionado) { htmlCorpo += `<td class="celula-selecionada" onclick="clicarCelula('${idCelula}')">✓</td>`; } 
-                else { htmlCorpo += `<td class="celula-livre" onclick="clicarCelula('${idCelula}')"></td>`; }
+        cab.innerHTML = hCab + '</tr>';
+        document.getElementById('texto-semana').innerText = `${nomeMeses[dSemana[0].getMonth()]} ${dSemana[0].getFullYear()}`;
+        let hCor = '';
+        turnos.forEach(t => {
+            hCor += `<tr><td class="turno-label">${t}</td>`;
+            dSemana.forEach(dat => {
+                const dStr = String(dat.getDate()).padStart(2,'0') + "/" + String(dat.getMonth()+1).padStart(2,'0') + "/" + dat.getFullYear();
+                const res = agendaAtual.find(r => r.data === dStr && r.turno === t);
+                const sel = selecionados.includes(`${dStr}|${t}`);
+                if (res) hCor += `<td class="celula-ocupada">X<br>${res.instrutor}</td>`;
+                else if (sel) hCor += `<td class="celula-selecionada" onclick="clicarCelula('${dStr}|${t}')">✓</td>`;
+                else hCor += `<td class="celula-livre" onclick="clicarCelula('${dStr}|${t}')"></td>`;
             });
-            htmlCorpo += '</tr>';
+            hCor += '</tr>';
         });
-        corpo.innerHTML = htmlCorpo;
+        cor.innerHTML = hCor;
     }
 
     function clicarCelula(id) {
-        const index = selecionados.indexOf(id);
-        if (index > -1) selecionados.splice(index, 1); else selecionados.push(id);
+        const i = selecionados.indexOf(id);
+        if (i > -1) selecionados.splice(i, 1); else selecionados.push(id);
         renderizarGrade(); 
     }
 
+    function mudarSemana(d) { dataInicioSemana.setDate(dataInicioSemana.getDate() + (d * 7)); renderizarGrade(); }
+
     function enviarReservas() {
-        const mat = document.getElementById('res-mat').value;
-        const nome = document.getElementById('res-nome').value;
-        const sala = document.getElementById('res-sala-sel').value;
-        
-        if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) return Swal.fire('Erro', 'Selecione os turnos e insira a matrícula!', 'warning');
-
-        const dadosReserva = selecionados.map(s => { const [data, turno] = s.split("|"); return { data: data, turno: turno }; });
-
-        Swal.fire({title: 'Gravando Reservas...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
-        
-        fetch(`${API_URL}?acao=reservar&sala=${sala}&matricula=${mat}&nome=${nome}&reservas=${encodeURIComponent(JSON.stringify(dadosReserva))}`)
+        const mat = document.getElementById('res-mat').value, nome = document.getElementById('res-nome').value, sala = document.getElementById('res-sala-sel').value;
+        if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) return Swal.fire('Erro', 'Verifique os dados!', 'warning');
+        const dr = selecionados.map(s => { const [d, t] = s.split("|"); return { data: d, turno: t }; });
+        Swal.fire({title: 'Salvando...', didOpen: () => Swal.showLoading()});
+        fetch(`${API_URL}?acao=reservar&sala=${sala}&matricula=${mat}&nome=${nome}&reservas=${encodeURIComponent(JSON.stringify(dr))}`)
         .then(r => r.json()).then(res => {
-            if(res.status === "sucesso") {
-                Swal.fire('Sucesso!', 'Agendamentos confirmados.', 'success').then(() => {
-                    selecionados = []; carregarAgenda(); 
-                });
-            } else if(res.status === "conflito") {
-                Swal.fire('Conflito', 'Os seguintes horários já foram ocupados por outro professor:\n\n' + res.msg, 'error').then(() => carregarAgenda());
-            } else { Swal.fire('Erro', res.msg, 'error'); }
+            if(res.status === "sucesso") Swal.fire('OK!', 'Reservas feitas.', 'success').then(() => { selecionados = []; carregarAgenda(); });
+            else Swal.fire('Erro', res.msg, 'error');
         });
     }
 
     function entrar() {
-        const matAtiva = document.getElementById('mat-login').value;
-        if(!matAtiva) return Swal.fire('Atenção', 'Digite sua matrícula', 'warning');
-        Swal.fire({title: 'Verificando...', didOpen: () => Swal.showLoading()});
-        fetch(`${API_URL}?acao=verificar&matricula=${matAtiva}&sala=${salaURL}`).then(r => r.json()).then(res => {
+        const m = document.getElementById('mat-login').value;
+        if(!m) return;
+        Swal.fire({title: 'Validando...', didOpen: () => Swal.showLoading()});
+        fetch(`${API_URL}?acao=verificar&matricula=${m}&sala=${salaURL}`).then(r => r.json()).then(res => {
             if(res.status === "sucesso" || res.status === "ja_logado") { mostrar('tela-devolucao'); Swal.close(); }
-            else { Swal.fire('Acesso Negado', res.msg, 'error'); }
+            else { Swal.fire('Erro', res.msg, 'error'); }
         });
     }
 
     function sair() {
-        const matAtiva = document.getElementById('mat-login').value;
-        fetch(`${API_URL}?acao=devolver&matricula=${matAtiva}&sala=${salaURL}&relato=${document.getElementById('relato').value}`)
-        .then(() => { Swal.fire('Saída Registrada', 'Chave devolvida com sucesso!', 'success').then(() => location.reload()); });
+        const m = document.getElementById('mat-login').value;
+        fetch(`${API_URL}?acao=devolver&matricula=${m}&sala=${salaURL}&relato=${document.getElementById('relato').value}`)
+        .then(() => Swal.fire('Saída OK', 'Até mais!', 'success').then(() => location.reload()));
     }
 </script>
 </body>
