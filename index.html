@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENAI - Lab Control Turbo</title>
+    <title>SENAI - Lab Control</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f4f7f6; }
@@ -54,6 +54,7 @@
             <input type="text" id="res-nome" placeholder="Nome" style="background:#eee; flex: 2;" readonly>
         </div>
         <select id="res-sala-sel" onchange="carregarAgenda()"><option value="">Carregando salas...</option></select>
+        
         <div id="area-calendario" class="hidden">
             <div class="nav-semana">
                 <button onclick="mudarSemana(-1)">&#9664;</button>
@@ -67,7 +68,9 @@
                 </table>
             </div>
         </div>
+        
         <button onclick="enviarReservas()" style="margin-top:15px;">CONFIRMAR AGENDAMENTOS</button>
+        <button onclick="gerarRelatorio()" style="background:#673ab7;">📊 RELATÓRIO DE OCUPAÇÃO</button>
         <button style="background:#777" onclick="location.reload()">VOLTAR</button>
     </div>
 </div>
@@ -76,10 +79,10 @@
     const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U";
     const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
     
-    // Removido o filtro problemático do GViz
+    // GViz apenas para dados estáticos (ultra rápido)
     const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
     const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
-    const URL_RESERVAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
+    const URL_RESERVAS_GVIZ = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
     
     const params = new URLSearchParams(window.location.search);
     const salaURL = params.get('sala');
@@ -108,6 +111,7 @@
         if(!mat) { inputNome.value = ""; return; }
         const pessoa = listaInstrutores.find(i => i.mat == mat);
         inputNome.value = pessoa ? pessoa.nome : "Não encontrado";
+        if(agendaAtual.length > 0) renderizarGrade(); // Re-avalia para liberar o "Cancelar"
     }
 
     async function abrirReserva() {
@@ -120,6 +124,7 @@
             ]);
             const jI = JSON.parse(resI.substring(47).slice(0, -2));
             listaInstrutores = jI.table.rows.map(r => ({ mat: r.c[0]?.v?.toString() || "", nome: r.c[1]?.v || "" }));
+            
             const jS = JSON.parse(resS.substring(47).slice(0, -2));
             const sel = document.getElementById('res-sala-sel');
             sel.innerHTML = '<option value="">Selecione a Sala</option>';
@@ -132,55 +137,25 @@
         } catch(e) { Swal.fire('Erro', 'Falha ao baixar os instrutores.', 'error'); }
     }
 
+    // AGORA LÊ VIA APPS SCRIPT (TEMPO REAL, SEM CACHE)
     async function carregarAgenda() {
         const salaSelecionada = document.getElementById('res-sala-sel').value;
         if(!salaSelecionada) return;
         document.getElementById('area-calendario').classList.remove('hidden');
-        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8">Atualizando grade...</td></tr>';
+        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8">Atualizando grade em tempo real...</td></tr>';
         
         try {
-            // BAIXA TUDO DIRETO E FILTRA NO JS PARA EVITAR BUGS DO GVIZ
-            const res = await fetch(`${URL_RESERVAS}&t=${Date.now()}`).then(r => r.text());
-            const json = JSON.parse(res.substring(47).slice(0, -2));
-            
-            agendaAtual = [];
-            if(json.table.rows) {
-                json.table.rows.forEach(r => {
-                    // Previne quebra de código se a linha estiver corrompida
-                    if (!r.c || !r.c[1] || !r.c[1].v) return;
-
-                    let salaBD = String(r.c[1].v).trim();
-                    if (salaBD !== salaSelecionada) return; // Filtra só as reservas desta sala
-
-                    let dRaw = r.c[0]?.f || r.c[0]?.v || "";
-                    let dTratada = String(dRaw).replace(/['"]/g, "").trim();
-                    
-                    if (dTratada.includes("Date(")) {
-                        let p = dTratada.match(/\d+/g);
-                        if(p && p.length >= 3) {
-                            dTratada = p[2].padStart(2,'0') + "/" + (parseInt(p[1]) + 1).toString().padStart(2,'0') + "/" + p[0];
-                        }
-                    } else if (dTratada.includes("-")) {
-                        let p = dTratada.split("T")[0].split("-");
-                        if(p.length >= 3) dTratada = `${p[2].padStart(2,'0')}/${p[1].padStart(2,'0')}/${p[0]}`;
-                    }
-                    
-                    agendaAtual.push({ 
-                        data: dTratada, 
-                        instrutor: r.c[3]?.v ? String(r.c[3].v).split(" ")[0] : "Ocupado", 
-                        turno: r.c[4]?.v ? String(r.c[4].v).trim().toUpperCase() : "" 
-                    });
-                });
-            }
+            const res = await fetch(`${API_URL}?acao=getAgendaTurbo&sala=${salaSelecionada}`).then(r => r.json());
+            agendaAtual = res; // Já vem limpo e filtrado do servidor!
             renderizarGrade();
         } catch(e) { 
-            console.error("Erro Agenda:", e);
             Swal.fire('Erro', 'Não foi possível ler as reservas.', 'error'); 
         }
     }
 
     function renderizarGrade() {
         const cab = document.getElementById('grade-cabecalho'), cor = document.getElementById('grade-corpo');
+        const matAtual = document.getElementById('res-mat').value.trim();
         let dSemana = [], hCab = '<tr><th>Turno</th>';
         
         for(let i=0; i<7; i++) {
@@ -196,12 +171,15 @@
             dSemana.forEach(dat => {
                 const dStr = String(dat.getDate()).padStart(2,'0') + "/" + String(dat.getMonth()+1).padStart(2,'0') + "/" + dat.getFullYear();
                 
-                // Checa com uppercase para não dar bug se o turno foi escrito "manhã" minúsculo no Google
                 const reserva = agendaAtual.find(r => r.data === dStr && r.turno === t.toUpperCase());
                 const sel = selecionados.includes(`${dStr}|${t}`);
                 
                 if (reserva) { 
-                    hCor += `<td class="celula-ocupada">X<br>${reserva.instrutor}</td>`; 
+                    if (matAtual && reserva.matricula === matAtual) {
+                        hCor += `<td class="celula-ocupada" style="background:#ffcdd2; cursor:pointer;" onclick="cancelarReserva('${dStr}', '${t}')" title="Clique para cancelar">MINHA<br>${reserva.instrutor}</td>`;
+                    } else {
+                        hCor += `<td class="celula-ocupada">X<br>${reserva.instrutor}</td>`; 
+                    }
                 } else if (sel) { 
                     hCor += `<td class="celula-selecionada" onclick="clicarCelula('${dStr}|${t}')">✓</td>`; 
                 } else { 
@@ -238,12 +216,78 @@
             if(res.status === "sucesso") {
                 Swal.fire('OK!', 'Agendamentos confirmados.', 'success').then(() => { 
                     selecionados = []; 
-                    carregarAgenda(); 
+                    carregarAgenda(); // Recarrega na mesma hora e os vermelhos vão aparecer!
                 });
             } else {
                 Swal.fire('Ocupado!', res.msg, 'error').then(() => carregarAgenda());
             }
         });
+    }
+
+    function cancelarReserva(data, turno) {
+        const mat = document.getElementById('res-mat').value;
+        const sala = document.getElementById('res-sala-sel').value;
+        
+        Swal.fire({
+            title: 'Cancelar Reserva?',
+            text: `Deseja desmarcar a sala ${sala} no dia ${data} (${turno})?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ed1c24',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sim, Cancelar',
+            cancelButtonText: 'Não'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({title: 'Apagando...', didOpen: () => Swal.showLoading()});
+                fetch(`${API_URL}?acao=cancelar&sala=${sala}&matricula=${mat}&data=${data}&turno=${turno}`)
+                .then(r => r.json()).then(res => {
+                    if(res.status === "sucesso") {
+                        Swal.fire('Cancelado!', 'Reserva removida.', 'success').then(() => carregarAgenda());
+                    } else {
+                        Swal.fire('Erro', res.msg, 'error');
+                    }
+                });
+            }
+        });
+    }
+
+    // RELATÓRIO VIA GVIZ (Porque aqui sim é ótimo ler tudo de uma vez)
+    async function gerarRelatorio() {
+        Swal.fire({title: 'Calculando ocupação...', didOpen: () => Swal.showLoading()});
+        try {
+            const res = await fetch(`${URL_RESERVAS_GVIZ}&t=${Date.now()}`).then(r => r.text());
+            const json = JSON.parse(res.substring(47).slice(0, -2));
+            
+            let contagemSalas = {}, contagemInstrutores = {}, total = 0;
+
+            if(json.table.rows) {
+                json.table.rows.forEach(r => {
+                    if (!r.c || !r.c[1] || !r.c[1].v) return;
+                    let sala = String(r.c[1].v).trim();
+                    if (sala.toLowerCase() === "sala") return;
+                    
+                    let instrutor = r.c[3]?.v ? String(r.c[3].v).split(" ")[0] : "Desconhecido";
+                    
+                    contagemSalas[sala] = (contagemSalas[sala] || 0) + 1;
+                    contagemInstrutores[instrutor] = (contagemInstrutores[instrutor] || 0) + 1;
+                    total++;
+                });
+            }
+
+            let topSalas = Object.entries(contagemSalas).sort((a,b) => b[1] - a[1]);
+            let topInstrutores = Object.entries(contagemInstrutores).sort((a,b) => b[1] - a[1]);
+
+            let html = `<div style="text-align:left; font-size:15px; color:#333; line-height: 1.6;">`;
+            html += `<p style="text-align:center; font-size:18px;"><b>Total Geral:</b> <span style="color:var(--azul)">${total} reservas</span></p><hr>`;
+            html += `<b style="color:var(--vermelho)">🔥 Top Laboratórios:</b><br>`;
+            topSalas.slice(0,5).forEach(s => html += `• <b>${s[0]}</b>: ${s[1]} reservas<br>`);
+            html += `<br><b style="color:var(--azul)">🏆 Top Instrutores:</b><br>`;
+            topInstrutores.slice(0,5).forEach(i => html += `• <b>${i[0]}</b>: ${i[1]} reservas<br>`);
+            html += `</div>`;
+
+            Swal.fire({ title: 'Estatísticas', html: html, icon: 'info', confirmButtonColor: '#005696' });
+        } catch(e) { Swal.fire('Erro', 'Não foi possível gerar o relatório.', 'error'); }
     }
 
     function entrar() {
