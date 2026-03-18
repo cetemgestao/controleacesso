@@ -3,46 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENAI Lab - Rápido</title>
+    <title>SENAI Lab - Gestão</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        :root { --azul: #005696; --vermelho: #ed1c24; }
-        body { font-family: sans-serif; background: #f0f2f5; padding: 15px; display: flex; justify-content: center; }
-        .card { background: white; padding: 20px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
-        input, select, button, textarea { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; box-sizing: border-box; }
+        :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f8f9fa; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--fundo); padding: 15px; display: flex; justify-content: center; }
+        .card { background: white; padding: 25px; border-radius: 15px; width: 100%; max-width: 450px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; }
+        input, select, button, textarea { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; box-sizing: border-box; }
         button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; }
-        .btn-ver { background: #6c757d; font-size: 14px; }
+        .btn-secundario { background: #6c757d; font-size: 14px; margin-top: 5px; }
         .hidden { display: none; }
-        .agenda-box { background: #fafafa; border: 1px solid #ddd; padding: 10px; border-radius: 8px; max-height: 120px; overflow-y: auto; text-align: left; }
+        
+        /* Estilo da Tabela de Agenda */
+        .agenda-container { margin: 15px 0; border: 1px solid #eee; border-radius: 8px; overflow: hidden; background: white; }
+        .agenda-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+        .agenda-table th { background: #f1f1f1; padding: 10px; color: #444; }
+        .agenda-table td { padding: 10px; border-top: 1px solid #eee; }
+        .agenda-hoje { background: #fff4f4; font-weight: bold; color: var(--vermelho); }
+        .scroll-area { max-height: 200px; overflow-y: auto; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8c/SENAI_Logo.png" style="width:130px; margin-bottom:10px;">
-    <h3 id="txt-sala" style="color:var(--vermelho)"></h3>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8c/SENAI_Logo.png" style="width:140px; margin-bottom:10px;">
+    <h3 id="txt-sala" style="color:var(--vermelho); margin-top:0;"></h3>
 
     <div id="tela-login">
         <input type="text" id="mat-login" placeholder="Sua Matrícula">
-        <button onclick="entrar()">ENTRAR NO LAB</button>
-        <button class="btn-ver" onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
+        <button onclick="entrar()">ENTRAR NO LABORATÓRIO</button>
+        <button class="btn-secundario" onclick="abrirReserva()">VER AGENDA / AGENDAR</button>
     </div>
 
     <div id="tela-devolucao" class="hidden">
-        <h2 style="color:var(--azul)">Sessão Ativa</h2>
-        <textarea id="relato" placeholder="Relato (Opcional)"></textarea>
-        <button style="background:var(--vermelho)" onclick="sair()">DEVOLVER CHAVE</button>
+        <h2 style="color:var(--azul)">Sessão em Aberto</h2>
+        <textarea id="relato" placeholder="Relato de uso (opcional)"></textarea>
+        <button style="background:var(--vermelho)" onclick="sair()">DEVOLVER CHAVE E SAIR</button>
     </div>
 
     <div id="tela-reserva" class="hidden">
-        <h3>Agendamento</h3>
-        <input type="text" id="res-mat" placeholder="Matrícula" oninput="buscarNome()">
-        <input type="text" id="res-nome" placeholder="Nome" style="background:#eee" readonly>
+        <h3>Calendário de Reservas</h3>
+        
+        <input type="text" id="res-mat" placeholder="Sua Matrícula" oninput="buscarNome()">
+        <input type="text" id="res-nome" placeholder="Nome do Instrutor" style="background:#f9f9f9" readonly>
+        
         <select id="res-sala-sel" onchange="verAgenda()"></select>
-        <div id="box-agenda" class="agenda-box"><p style="font-size:12px">Agenda...</p></div>
-        <input type="text" id="res-datas" placeholder="Datas (Ex: 17/03/2026, 18/03/2026)">
+
+        <div id="box-agenda" class="agenda-container hidden">
+            <div class="scroll-area">
+                <table class="agenda-table" id="tabela-corpo">
+                    <thead>
+                        <tr><th>Data</th><th>Turno</th><th>Instrutor</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <p style="font-size:11px; color:blue; text-align:left; margin-bottom:0;">Datas (Separe por vírgula):</p>
+        <input type="text" id="res-datas" placeholder="Ex: 18/03/2026, 19/03/2026">
+        
         <select id="res-turno"><option>Manhã</option><option>Tarde</option><option>Noite</option></select>
-        <button onclick="salvarReserva()">RESERVAR</button>
+        
+        <button onclick="salvarReserva()">CONFIRMAR RESERVAS</button>
         <button style="background:#666" onclick="mostrar('tela-login')">VOLTAR</button>
     </div>
 </div>
@@ -62,7 +85,7 @@
         const mat = document.getElementById('res-mat').value;
         if(mat.length < 3) return;
         fetch(`${API_URL}?acao=getUsuario&matricula=${mat}`).then(r => r.json()).then(res => {
-            document.getElementById('res-nome').value = res.nome;
+            document.getElementById('res-nome').value = res.nome || "Matrícula não cadastrada";
         });
     }
 
@@ -70,7 +93,7 @@
         mostrar('tela-reserva');
         fetch(`${API_URL}?acao=getSalas`).then(r => r.json()).then(res => {
             const sel = document.getElementById('res-sala-sel');
-            sel.innerHTML = '<option value="">Selecione a Sala</option>';
+            sel.innerHTML = '<option value="">Selecione o Laboratório</option>';
             res.slice(1).forEach(s => sel.innerHTML += `<option value="${s[0]}">${s[1]}</option>`);
         });
     }
@@ -78,9 +101,25 @@
     function verAgenda() {
         const s = document.getElementById('res-sala-sel').value;
         const box = document.getElementById('box-agenda');
-        if(!s) return; box.innerHTML = "Carregando...";
+        const tbody = document.querySelector('#tabela-corpo tbody');
+        if(!s) { box.classList.add('hidden'); return; }
+        
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Carregando...</td></tr>';
+        box.classList.remove('hidden');
+
         fetch(`${API_URL}?acao=getAgenda&sala=${s}`).then(r => r.json()).then(res => {
-            box.innerHTML = res.length <= 1 ? "Livre!" : res.slice(1).map(r => `<div style="font-size:11px border-bottom:1px solid #eee">📅 ${r[0]} - ${r[4]} (${r[3]})</div>`).join('');
+            if(res.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Nenhuma reserva.</td></tr>';
+            } else {
+                const hoje = new Date().toLocaleDateString('pt-BR');
+                tbody.innerHTML = res.map(r => `
+                    <tr class="${r[0] === hoje ? 'agenda-hoje' : ''}">
+                        <td>${r[0]}</td>
+                        <td>${r[4]}</td>
+                        <td>${r[3].split(' ')[0]}</td>
+                    </tr>
+                `).join('');
+            }
         });
     }
 
@@ -89,24 +128,29 @@
         const mat = document.getElementById('res-mat').value;
         const nome = document.getElementById('res-nome').value;
         const sala = document.getElementById('res-sala-sel').value;
-        if(!datas || !mat || !sala) return alert("Preencha tudo");
-        Swal.fire({title: 'Salvando...', didOpen: () => Swal.showLoading()});
-        fetch(`${API_URL}?acao=reservar&datas=${datas}&matricula=${mat}&nome=${nome}&sala=${sala}&turno=${document.getElementById('res-turno').value}`)
-        .then(() => { Swal.fire('Sucesso!', 'Reserva ok', 'success').then(() => mostrar('tela-login')); });
+        const turno = document.getElementById('res-turno').value;
+
+        if(!datas || !mat || !sala || nome.includes("não cadastrada")) return Swal.fire('Erro', 'Dados incompletos', 'warning');
+
+        Swal.fire({title: 'Gravando...', didOpen: () => Swal.showLoading()});
+        fetch(`${API_URL}?acao=reservar&datas=${datas}&matricula=${mat}&nome=${nome}&sala=${sala}&turno=${turno}`)
+        .then(() => { Swal.fire('Sucesso!', 'Reserva efetuada.', 'success').then(() => mostrar('tela-login')); });
     }
 
     function entrar() {
         matAtiva = document.getElementById('mat-login').value;
         if(!matAtiva) return;
-        Swal.fire({title: 'Entrando...', didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Verificando...', didOpen: () => Swal.showLoading()});
         fetch(`${API_URL}?acao=verificar&matricula=${matAtiva}&sala=${salaURL}`).then(r => r.json()).then(res => {
-            if(res.status === "sucesso" || res.status === "ja_logado") { mostrar('tela-devolucao'); Swal.close(); }
-            else { Swal.fire('Erro', res.msg, 'error'); }
+            if(res.status === "sucesso" || res.status === "ja_logado") {
+                mostrar('tela-devolucao'); Swal.close();
+            } else { Swal.fire('Negado', res.msg, 'error'); }
         });
     }
 
     function sair() {
-        fetch(`${API_URL}?acao=devolver&matricula=${matAtiva}&sala=${salaURL}&relato=${document.getElementById('relato').value}`)
+        const relato = document.getElementById('relato').value;
+        fetch(`${API_URL}?acao=devolver&matricula=${matAtiva}&sala=${salaURL}&relato=${relato}`)
         .then(() => { Swal.fire('Saída OK', 'Até logo!', 'success').then(() => location.reload()); });
     }
 </script>
