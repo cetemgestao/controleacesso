@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--fundo); padding: 10px; margin: 0; display: flex; justify-content: center; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--fundo); padding: 10px; margin: 0; display: flex; justify-content: center; }
         .card { background: white; padding: 20px; border-radius: 12px; max-width: 600px; width: 100%; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
         input, select, button { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; box-sizing: border-box; }
         button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
@@ -84,9 +84,8 @@
 <script>
     // ======= CONFIGURAÇÃO GViz =======
     const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U"; // Ex: 1MjfQ5NQ3BvQAWzmIxjoqDBmeQdAn9EREGjqnj2EAR1I
-    const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec"; 
     
-    // Links Diretos do Google
     const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
     const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
     const URL_RESERVAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
@@ -129,24 +128,21 @@
 
     async function abrirReserva() {
         mostrar('tela-reserva');
-        Swal.fire({title: 'Carregando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Acessando Banco de Dados...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
         try {
-            // BAIXA SALAS E INSTRUTORES SIMULTANEAMENTE DA PLANILHA (MUITO RÁPIDO)
             const [resSalas, resInst] = await Promise.all([
                 fetch(`${URL_SALAS}&t=${Date.now()}`).then(r => r.text()),
                 fetch(`${URL_INSTRUTORES}&t=${Date.now()}`).then(r => r.text())
             ]);
 
-            // Formata Instrutores
             const jsonInst = JSON.parse(resInst.substring(47).slice(0, -2));
-            if(jsonInst.table.rows.length > 1) {
-                listaInstrutores = jsonInst.table.rows.slice(1).map(r => {
+            if(jsonInst.table.rows.length > 0) {
+                listaInstrutores = jsonInst.table.rows.map(r => {
                     return { mat: r.c[0]?.v?.toString(), nome: r.c[1]?.v };
                 }).filter(i => i.mat);
             }
 
-            // Formata Salas
             const jsonSalas = JSON.parse(resSalas.substring(47).slice(0, -2));
             const sel = document.getElementById('res-sala-sel');
             sel.innerHTML = '<option value="">Selecione a Sala</option>';
@@ -170,10 +166,9 @@
         if(!sala) { document.getElementById('area-calendario').classList.add('hidden'); return; }
         
         document.getElementById('area-calendario').classList.remove('hidden');
-        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8">Atualizando...</td></tr>';
+        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8" style="padding:20px; color:#666;">Buscando horários ocupados...</td></tr>';
         
         try {
-            // USA QUERY SQL DO GVIZ PARA BAIXAR APENAS AS RESERVAS DESTA SALA
             const querySegura = encodeURIComponent(`select * where B = '${sala}'`);
             const res = await fetch(`${URL_RESERVAS}&tq=${querySegura}&t=${Date.now()}`).then(r => r.text());
             const json = JSON.parse(res.substring(47).slice(0, -2));
@@ -181,16 +176,30 @@
             agendaAtual = [];
             if(json.table.rows.length > 0) {
                 agendaAtual = json.table.rows.map(r => {
+                    // O TRADUTOR DE DATAS INDESTRUTÍVEL
+                    let dVal = r.c[0]?.f || r.c[0]?.v || "";
+                    let dLimpa = String(dVal).replace(/['"]/g, "").trim(); // Remove aspas
+                    
+                    // Se vier como Objeto Date do Google (Ex: Date(2026, 2, 18))
+                    if(dLimpa.startsWith("Date(")) {
+                        let pts = dLimpa.match(/Date\((\d+),\s*(\d+),\s*(\d+)/);
+                        if(pts) {
+                            // Mês no JS começa em 0, por isso soma 1
+                            dLimpa = String(pts[3]).padStart(2,'0') + "/" + String(parseInt(pts[2])+1).padStart(2,'0') + "/" + pts[1];
+                        }
+                    } else if (dLimpa.includes("-")) {
+                        // Se vier invertido do GViz (YYYY-MM-DD)
+                        let pts = dLimpa.split("T")[0].split("-");
+                        if(pts.length === 3) dLimpa = `${pts[2]}/${pts[1]}/${pts[0]}`;
+                    }
+
                     return {
-                        data: r.c[0]?.f || r.c[0]?.v, // f=formatada, v=valor puro
-                        instrutor: r.c[3]?.v?.split(" ")[0],
-                        turno: r.c[4]?.v
+                        data: dLimpa,
+                        instrutor: r.c[3]?.v ? String(r.c[3].v).split(" ")[0] : "Inst.",
+                        turno: r.c[4]?.v ? String(r.c[4].v).trim() : ""
                     };
                 }).filter(r => r.data && r.data.includes("/"));
             }
-            
-            // Limpa as aspas simples ('18/03/2026) se vierem do banco
-            agendaAtual.forEach(a => { if(a.data.startsWith("'")) a.data = a.data.substring(1); });
 
             renderizarGrade();
         } catch(e) {
@@ -255,11 +264,11 @@
         const nome = document.getElementById('res-nome').value;
         const sala = document.getElementById('res-sala-sel').value;
         
-        if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) return Swal.fire('Erro', 'Selecione os turnos válidos!', 'warning');
+        if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) return Swal.fire('Erro', 'Selecione os turnos e insira a matrícula!', 'warning');
 
         const dadosReserva = selecionados.map(s => { const [data, turno] = s.split("|"); return { data: data, turno: turno }; });
 
-        Swal.fire({title: 'Gravando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Gravando Reservas...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
         fetch(`${API_URL}?acao=reservar&sala=${sala}&matricula=${mat}&nome=${nome}&reservas=${encodeURIComponent(JSON.stringify(dadosReserva))}`)
         .then(r => r.json()).then(res => {
@@ -268,7 +277,7 @@
                     selecionados = []; carregarAgenda(); 
                 });
             } else if(res.status === "conflito") {
-                Swal.fire('Conflito', 'Horários já ocupados: ' + res.msg, 'error').then(() => carregarAgenda());
+                Swal.fire('Conflito', 'Os seguintes horários já foram ocupados por outro professor:\n\n' + res.msg, 'error').then(() => carregarAgenda());
             } else { Swal.fire('Erro', res.msg, 'error'); }
         });
     }
@@ -279,14 +288,14 @@
         Swal.fire({title: 'Verificando...', didOpen: () => Swal.showLoading()});
         fetch(`${API_URL}?acao=verificar&matricula=${matAtiva}&sala=${salaURL}`).then(r => r.json()).then(res => {
             if(res.status === "sucesso" || res.status === "ja_logado") { mostrar('tela-devolucao'); Swal.close(); }
-            else { Swal.fire('Negado', res.msg, 'error'); }
+            else { Swal.fire('Acesso Negado', res.msg, 'error'); }
         });
     }
 
     function sair() {
         const matAtiva = document.getElementById('mat-login').value;
         fetch(`${API_URL}?acao=devolver&matricula=${matAtiva}&sala=${salaURL}&relato=${document.getElementById('relato').value}`)
-        .then(() => { Swal.fire('Saída OK', 'Até logo!', 'success').then(() => location.reload()); });
+        .then(() => { Swal.fire('Saída Registrada', 'Chave devolvida com sucesso!', 'success').then(() => location.reload()); });
     }
 </script>
 </body>
