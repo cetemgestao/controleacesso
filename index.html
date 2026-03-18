@@ -3,42 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENAI - Reserva por Turno</title>
+    <title>SENAI - Reserva por Turnos</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@6.1.8/index.global.min.js"></script>
     <style>
         :root { --azul: #005696; --vermelho: #ed1c24; }
-        body { font-family: sans-serif; background: #f4f7f6; padding: 10px; }
-        .card { background: white; padding: 20px; border-radius: 15px; max-width: 600px; margin: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
-        input, select, button { width: 100%; padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 10px; }
+        .card { background: white; padding: 20px; border-radius: 15px; max-width: 800px; margin: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
+        input, select, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; }
         button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; }
         .hidden { display: none; }
-        #calendar { margin-top: 15px; height: 500px; }
-        /* Esconde horas desnecessárias para focar nos turnos */
-        .fc-timegrid-slot { height: 50px !important; }
+        #calendar { margin-top: 20px; height: 450px; background: #fff; }
+        .fc-resource-area { width: 100px !important; font-weight: bold; color: var(--azul); }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8c/SENAI_Logo.png" style="width:120px;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8c/SENAI_Logo.png" style="width:140px;">
     <h3 id="txt-sala" style="color:var(--vermelho)"></h3>
 
     <div id="tela-login">
-        <input type="text" id="mat-login" placeholder="Matrícula">
-        <button onclick="entrar()">ENTRAR NO LAB</button>
+        <input type="text" id="mat-login" placeholder="Sua Matrícula">
+        <button onclick="entrar()">LIBERAR ACESSO</button>
         <button style="background:#6c757d; margin-top:10px;" onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
     </div>
 
     <div id="tela-reserva" class="hidden">
-        <input type="text" id="res-mat" placeholder="Sua Matrícula" oninput="buscarNome()">
-        <input type="text" id="res-nome" placeholder="Nome" style="background:#f9f9f9" readonly>
-        <select id="res-sala-sel" onchange="carregarCalendario()"></select>
+        <div style="display: flex; gap: 10px;">
+            <input type="text" id="res-mat" placeholder="Matrícula" oninput="buscarNome()">
+            <input type="text" id="res-nome" placeholder="Nome" style="background:#eee" readonly>
+        </div>
+        <select id="res-sala-sel" onchange="carregarAgenda()"></select>
         
         <div id="calendar"></div>
         
-        <p style="font-size:11px; color:#666;">Clique nos espaços vazios (Manhã, Tarde ou Noite) para agendar.</p>
-        <button onclick="salvarReservas()">CONFIRMAR AGENDAMENTOS SELECIONADOS</button>
+        <p style="font-size:12px; color:#555;">Clique nos espaços brancos para selecionar o turno e o dia.</p>
+        <button onclick="enviarReservas()">CONFIRMAR AGENDAMENTOS SELECIONADOS</button>
         <button style="background:#777" onclick="location.reload()">VOLTAR</button>
     </div>
 </div>
@@ -49,7 +50,7 @@
     document.getElementById('txt-sala').innerText = "Lab: " + salaURL;
     
     let calendar;
-    let selecoes = []; // Guardará {data, turno}
+    let selecionados = [];
 
     function buscarNome() {
         const mat = document.getElementById('res-mat').value;
@@ -71,32 +72,26 @@
 
         const calendarEl = document.getElementById('calendar');
         calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'timeGridWeek', // Mostra a semana com horas
+            schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
+            initialView: 'resourceTimelineWeek', // Visão de Linha do Tempo Semanal
             locale: 'pt-br',
-            slotMinTime: '08:00:00',
-            slotMaxTime: '22:00:00',
-            allDaySlot: false,
-            headerToolbar: { left: 'prev,next', center: 'title', right: 'timeGridWeek,dayGridMonth' },
+            resources: [
+                { id: 'manha', title: 'MANHÃ' },
+                { id: 'tarde', title: 'TARDE' },
+                { id: 'noite', title: 'NOITE' }
+            ],
             dateClick: function(info) {
-                const dataPlena = info.date;
-                const hora = dataPlena.getHours();
-                let turno = "";
-                
-                if (hora >= 8 && hora < 12) turno = "Manhã";
-                else if (hora >= 13 && hora < 18) turno = "Tarde";
-                else if (hora >= 18) turno = "Noite";
-                
-                if(!turno) return;
+                const dataStr = info.dateStr.split("T")[0]; // YYYY-MM-DD
+                const tId = info.resource.id;
+                const idUnico = dataStr + tId;
 
-                const dataFormatada = dataPlena.toLocaleDateString('pt-BR');
-                const idSelecao = dataFormatada + turno;
-
-                const index = selecoes.findIndex(s => s.id === idSelecao);
+                const index = selecionados.findIndex(s => s.id === idUnico);
                 if (index > -1) {
-                    selecoes.splice(index, 1);
+                    selecionados.splice(index, 1);
                     info.dayEl.style.backgroundColor = '';
                 } else {
-                    selecoes.push({id: idSelecao, data: dataFormatada, turno: turno});
+                    const [y, m, d] = dataStr.split("-");
+                    selecionados.push({id: idUnico, data: `${d}/${m}/${y}`, turnoId: tId});
                     info.dayEl.style.backgroundColor = '#d1e7ff';
                 }
             }
@@ -104,31 +99,31 @@
         calendar.render();
     }
 
-    function carregarCalendario() {
+    function carregarAgenda() {
         const sala = document.getElementById('res-sala-sel').value;
         if(!sala) return;
+        selecionados = [];
         calendar.removeAllEvents();
+        Swal.fire({title: 'Buscando agenda...', didOpen: () => Swal.showLoading()});
         fetch(`${API_URL}?acao=getAgenda&sala=${sala}`).then(r => r.json()).then(ev => {
             calendar.addEventSource(ev);
+            Swal.close();
         });
     }
 
-    function salvarReservas() {
+    function enviarReservas() {
         const mat = document.getElementById('res-mat').value;
         const nome = document.getElementById('res-nome').value;
         const sala = document.getElementById('res-sala-sel').value;
         
-        if(selecoes.length === 0 || !mat || !sala) return alert("Selecione os turnos no calendário!");
+        if(selecionados.length === 0 || !mat || !sala) return Swal.fire('Erro', 'Selecione os turnos no calendário!', 'warning');
 
-        Swal.fire({title: 'Salvando...', didOpen: () => Swal.showLoading()});
-        
-        const url = `${API_URL}?acao=reservar&sala=${sala}&matricula=${mat}&nome=${nome}&reservas=${JSON.stringify(selecoes)}`;
-        fetch(url).then(() => {
-            Swal.fire('Sucesso!', 'Reservas confirmadas!', 'success').then(() => location.reload());
+        Swal.fire({title: 'Gravando...', didOpen: () => Swal.showLoading()});
+        fetch(`${API_URL}?acao=reservar&sala=${sala}&matricula=${mat}&nome=${nome}&reservas=${JSON.stringify(selecionados)}`)
+        .then(() => {
+            Swal.fire('Sucesso!', 'Agendamentos confirmados.', 'success').then(() => location.reload());
         });
     }
-    
-    // ... manter funções de entrar e sair ...
 </script>
 </body>
 </html>
