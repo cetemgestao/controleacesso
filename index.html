@@ -38,7 +38,7 @@
 
     <div id="tela-login">
         <div id="aviso-qr" class="aviso-qr hidden">
-            📍 Acesso Remoto<br><span style="font-size:12px;">Para liberar a porta, utilize a câmera do celular no QR Code do laboratório.</span>
+            📍 Central de Reservas<br><span style="font-size:12px;">Para destravar a porta, utilize a câmera do celular no QR Code do laboratório.</span>
         </div>
         
         <input type="text" id="mat-login" placeholder="Sua Matrícula">
@@ -54,7 +54,7 @@
 
     <div id="tela-reserva" class="hidden">
         <div style="display: flex; gap: 8px;">
-            <input type="text" id="res-mat" placeholder="Matrícula" onblur="buscarNome()" style="flex: 1;">
+            <input type="text" id="res-mat" placeholder="Matrícula" oninput="buscarNome()" style="flex: 1;">
             <input type="text" id="res-nome" placeholder="Nome" style="background:#eee; flex: 2;" readonly>
         </div>
         <select id="res-sala-sel" onchange="carregarAgenda()"></select>
@@ -85,11 +85,10 @@
     const params = new URLSearchParams(window.location.search);
     const salaURL = params.get('sala');
     
-    // Lógica inteligente do QR Code
     if (salaURL) {
         document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
     } else {
-        document.getElementById('txt-sala').innerText = "Central de Reservas";
+        document.getElementById('txt-sala').innerText = "Sistema de Reservas";
         document.getElementById('mat-login').classList.add('hidden');
         document.getElementById('btn-entrar').classList.add('hidden');
         document.getElementById('aviso-qr').classList.remove('hidden');
@@ -97,6 +96,8 @@
     
     let selecionados = [];
     let agendaAtual = [];
+    let listaInstrutores = []; // Guarda os instrutores na memória do celular
+    
     let dataInicioSemana = new Date(); 
     const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const nomeMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -107,25 +108,33 @@
         document.getElementById(id).classList.remove('hidden');
     }
 
+    // NOVA BUSCA INSTANTÂNEA
     function buscarNome() {
         const mat = document.getElementById('res-mat').value;
-        if(mat.length < 3) return;
-        fetch(`${API_URL}?acao=getUsuario&matricula=${mat}`).then(r => r.json()).then(res => {
-            document.getElementById('res-nome').value = res.nome || "Não cadastrado";
-        });
+        if(mat.length === 0) { document.getElementById('res-nome').value = ""; return; }
+        
+        // Procura na memória local sem acessar a internet
+        const pessoa = listaInstrutores.find(i => i[0].toString() === mat.toString());
+        document.getElementById('res-nome').value = pessoa ? pessoa[1] : "Não encontrado";
     }
 
     function abrirReserva() {
         mostrar('tela-reserva');
-        fetch(`${API_URL}?acao=getSalas`).then(r => r.json()).then(res => {
+        Swal.fire({title: 'Carregando Sistema...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        
+        // Faz apenas UM download contendo Salas e Instrutores
+        fetch(`${API_URL}?acao=getDadosIniciais`).then(r => r.json()).then(res => {
+            listaInstrutores = res.instrutores;
+            
             const sel = document.getElementById('res-sala-sel');
             sel.innerHTML = '<option value="">Selecione a Sala</option>';
-            res.slice(1).forEach(s => sel.innerHTML += `<option value="${s[0]}">${s[1]}</option>`);
+            res.salas.slice(1).forEach(s => sel.innerHTML += `<option value="${s[0]}">${s[1]}</option>`);
             
-            // Se já veio com a sala na URL, auto-seleciona para agilizar
             if(salaURL) {
                 sel.value = salaURL;
-                carregarAgenda();
+                carregarAgenda(); // Puxa os vermelhos
+            } else {
+                Swal.close();
             }
         });
     }
@@ -135,7 +144,7 @@
         if(!sala) { document.getElementById('area-calendario').classList.add('hidden'); return; }
         
         document.getElementById('area-calendario').classList.remove('hidden');
-        Swal.fire({title: 'Carregando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Buscando agenda...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
         fetch(`${API_URL}?acao=getAgenda&sala=${sala}`).then(r => r.json()).then(dados => {
             agendaAtual = dados;
@@ -172,7 +181,6 @@
         htmlCabecalho += '</tr>';
         cabecalho.innerHTML = htmlCabecalho;
         
-        // Exibe o MÊS e ANO atual no topo do calendário
         document.getElementById('texto-semana').innerText = `${nomeMeses[datasSemana[0].getMonth()]} ${datasSemana[0].getFullYear()}`;
 
         let htmlCorpo = '';
