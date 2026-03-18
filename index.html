@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--fundo); padding: 10px; margin: 0; display: flex; justify-content: center; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--fundo); padding: 10px; margin: 0; display: flex; justify-content: center; }
         .card { background: white; padding: 20px; border-radius: 12px; max-width: 600px; width: 100%; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
         input, select, button, textarea { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; box-sizing: border-box; }
         button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
@@ -21,7 +21,7 @@
         .celula-livre { background: white; cursor: pointer; transition: 0.2s; }
         .celula-livre:hover { background: #f0f7ff; }
         .celula-selecionada { background: #b3d4ff !important; color: var(--azul); font-weight: bold; border: 2px solid var(--azul) !important; cursor: pointer; }
-        .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; font-size: 10px; line-height: 1.2; cursor: not-allowed; }
+        .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; font-size: 10px; line-height: 1.2; }
         .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); }
         .nav-semana button { width: auto; padding: 5px 15px; margin: 0; }
         .aviso-qr { color: #666; font-size: 13px; margin: 10px 0; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; }
@@ -52,6 +52,7 @@
             <input type="text" id="res-nome" placeholder="Nome" style="background:#eee; flex: 2;" readonly>
         </div>
         <select id="res-sala-sel" onchange="carregarAgenda()"><option value="">Carregando salas...</option></select>
+        
         <div id="area-calendario" class="hidden">
             <div class="nav-semana">
                 <button onclick="mudarSemana(-1)">&#9664;</button>
@@ -65,6 +66,7 @@
                 </table>
             </div>
         </div>
+        
         <button onclick="enviarReservas()" style="margin-top:15px;">CONFIRMAR AGENDAMENTOS</button>
         <button onclick="gerarRelatorio()" style="background:#673ab7;">📊 RELATÓRIO DE OCUPAÇÃO</button>
         <button style="background:#777" onclick="location.reload()">VOLTAR</button>
@@ -75,16 +77,20 @@
     const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U";
     const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
     
-    // GViz só para os menus estáticos que não precisam de tempo real
+    // Motor GViz do sistema de Evasão (Ultra Rápido)
     const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
     const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
+    const URL_RESERVAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
     
     const params = new URLSearchParams(window.location.search);
     const salaURL = params.get('sala');
-    if (salaURL) document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
-    else {
+
+    if (salaURL) {
+        document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
+    } else {
         document.getElementById('txt-sala').innerText = "Central de Reservas";
-        document.querySelectorAll('#mat-login, #btn-entrar').forEach(el => el.classList.add('hidden'));
+        document.getElementById('mat-login').classList.add('hidden');
+        document.getElementById('btn-entrar').classList.add('hidden');
         document.getElementById('aviso-qr').classList.remove('hidden');
     }
     
@@ -108,7 +114,7 @@
 
     async function abrirReserva() {
         mostrar('tela-reserva');
-        Swal.fire({title: 'Carregando banco...', didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Carregando...', didOpen: () => Swal.showLoading()});
         try {
             const [resS, resI] = await Promise.all([
                 fetch(`${URL_SALAS}&t=${Date.now()}`).then(r => r.text()),
@@ -116,45 +122,74 @@
             ]);
             const jI = JSON.parse(resI.substring(47).slice(0, -2));
             listaInstrutores = jI.table.rows.map(r => ({ mat: r.c[0]?.v?.toString() || "", nome: r.c[1]?.v || "" }));
+            
             const jS = JSON.parse(resS.substring(47).slice(0, -2));
             const sel = document.getElementById('res-sala-sel');
             sel.innerHTML = '<option value="">Selecione a Sala</option>';
-            jS.table.rows.forEach(r => { if(r.c && r.c[0]?.v && r.c[0].v !== "Sala") sel.innerHTML += `<option value="${r.c[0].v}">${r.c[1]?.v}</option>`; });
+            jS.table.rows.forEach(r => { 
+                if(r.c && r.c[0]?.v && String(r.c[0].v).toLowerCase() !== "sala") {
+                    sel.innerHTML += `<option value="${r.c[0].v}">${r.c[1]?.v}</option>`; 
+                }
+            });
             if(salaURL) { sel.value = salaURL; carregarAgenda(); } else { Swal.close(); }
-        } catch(e) { Swal.fire('Erro', 'Falha na conexão.', 'error'); }
+        } catch(e) { Swal.fire('Erro', 'Falha ao baixar dados.', 'error'); }
     }
 
-    // LÊ A AGENDA DIRETO DO SCRIPT AO VIVO
-    function carregarAgenda() {
-        const sala = document.getElementById('res-sala-sel').value;
-        if(!sala) return;
+    // Leitura 100% via GViz (Rápida com Quebra de Cache Date.now())
+    async function carregarAgenda() {
+        const salaSelecionada = document.getElementById('res-sala-sel').value;
+        if(!salaSelecionada) return;
         document.getElementById('area-calendario').classList.remove('hidden');
-        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8" style="padding:20px; color:#555;"><b>Sincronizando ao vivo com a planilha...</b></td></tr>';
+        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8">Carregando horários...</td></tr>';
         
-        fetch(`${API_URL}?acao=getAgenda&sala=${sala}`)
-        .then(r => r.json())
-        .then(res => {
-            agendaAtual = res;
+        try {
+            const res = await fetch(`${URL_RESERVAS}&t=${Date.now()}`).then(r => r.text());
+            const json = JSON.parse(res.substring(47).slice(0, -2));
+            
+            agendaAtual = [];
+            if(json.table.rows) {
+                json.table.rows.forEach(r => {
+                    if (!r.c || !r.c[1] || !r.c[1].v) return;
+
+                    let salaBD = String(r.c[1].v).trim();
+                    if (salaBD !== salaSelecionada) return; 
+
+                    let dRaw = r.c[0]?.f || r.c[0]?.v || "";
+                    let dTratada = String(dRaw).replace(/['"]/g, "").trim();
+                    
+                    if (dTratada.includes("Date(")) {
+                        let p = dTratada.match(/\d+/g);
+                        if(p && p.length >= 3) dTratada = p[2].padStart(2,'0') + "/" + (parseInt(p[1]) + 1).toString().padStart(2,'0') + "/" + p[0];
+                    } else if (dTratada.includes("-")) {
+                        let p = dTratada.split("T")[0].split("-");
+                        if(p.length >= 3) dTratada = `${p[2].padStart(2,'0')}/${p[1].padStart(2,'0')}/${p[0]}`;
+                    }
+                    
+                    agendaAtual.push({ 
+                        data: dTratada, 
+                        matricula: r.c[2]?.v ? String(r.c[2].v).trim() : "",
+                        instrutor: r.c[3]?.v ? String(r.c[3].v).split(" ")[0] : "Ocupado", 
+                        turno: r.c[4]?.v ? String(r.c[4].v).trim().toUpperCase() : "" 
+                    });
+                });
+            }
             renderizarGrade();
-        })
-        .catch(e => {
-            document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8" style="color:red;">Erro ao ler agenda.</td></tr>';
-        });
+        } catch(e) { Swal.fire('Erro', 'Não foi possível ler as reservas.', 'error'); }
     }
 
     function renderizarGrade() {
-        const cor = document.getElementById('grade-corpo');
+        const cab = document.getElementById('grade-cabecalho'), cor = document.getElementById('grade-corpo');
         const matAtual = document.getElementById('res-mat').value.trim();
-        let dSemana = [], hCor = '';
+        let dSemana = [], hCab = '<tr><th>Turno</th>';
         
         for(let i=0; i<7; i++) {
             let dAt = new Date(dataInicioSemana); dAt.setDate(dAt.getDate() + i); dSemana.push(dAt);
+            hCab += `<th>${String(dAt.getDate()).padStart(2,'0')}/${String(dAt.getMonth()+1).padStart(2,'0')}<br>${diasSemana[dAt.getDay()]}</th>`;
         }
-        
-        const hCab = '<tr><th>Turno</th>' + dSemana.map(d => `<th>${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}<br>${diasSemana[d.getDay()]}</th>`).join('') + '</tr>';
-        document.getElementById('grade-cabecalho').innerHTML = hCab;
+        cab.innerHTML = hCab + '</tr>';
         document.getElementById('texto-semana').innerText = `${nomeMeses[dSemana[0].getMonth()]} ${dSemana[0].getFullYear()}`;
         
+        let hCor = '';
         turnos.forEach(t => {
             hCor += `<tr><td class="turno-label">${t}</td>`;
             dSemana.forEach(dat => {
@@ -163,11 +198,17 @@
                 const reserva = agendaAtual.find(r => r.data === dStr && r.turno === t.toUpperCase());
                 const sel = selecionados.includes(`${dStr}|${t}`);
                 
-                if (reserva) {
-                    if (matAtual && reserva.matricula === matAtual) hCor += `<td class="celula-ocupada" style="background:#ffcdd2; cursor:pointer;" onclick="cancelarReserva('${dStr}', '${t}')" title="Clique para cancelar">MINHA<br>${reserva.instrutor}</td>`;
-                    else hCor += `<td class="celula-ocupada">X<br>${reserva.instrutor}</td>`;
-                } else if (sel) hCor += `<td class="celula-selecionada" onclick="clicarCelula('${dStr}|${t}')">✓</td>`;
-                else hCor += `<td class="celula-livre" onclick="clicarCelula('${dStr}|${t}')"></td>`;
+                if (reserva) { 
+                    if (matAtual && reserva.matricula === matAtual) {
+                        hCor += `<td class="celula-ocupada" style="background:#ffcdd2; cursor:pointer;" onclick="cancelarReserva('${dStr}', '${t}')" title="Clique para desmarcar">MINHA<br>${reserva.instrutor}</td>`;
+                    } else {
+                        hCor += `<td class="celula-ocupada" style="cursor:not-allowed;">X<br>${reserva.instrutor}</td>`; 
+                    }
+                } else if (sel) { 
+                    hCor += `<td class="celula-selecionada" onclick="clicarCelula('${dStr}|${t}')">✓</td>`; 
+                } else { 
+                    hCor += `<td class="celula-livre" onclick="clicarCelula('${dStr}|${t}')"></td>`; 
+                }
             });
             hCor += '</tr>';
         });
@@ -183,73 +224,113 @@
     function mudarSemana(d) { dataInicioSemana.setDate(dataInicioSemana.getDate() + (d * 7)); renderizarGrade(); }
 
     function enviarReservas() {
-        const mat = document.getElementById('res-mat').value, nome = document.getElementById('res-nome').value, sala = document.getElementById('res-sala-sel').value;
-        if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) return Swal.fire('Erro', 'Dados incompletos!', 'warning');
+        const mat = document.getElementById('res-mat').value;
+        const nome = document.getElementById('res-nome').value;
+        const sala = document.getElementById('res-sala-sel').value;
         
-        const dr = selecionados.map(s => ({ data: s.split("|")[0], turno: s.split("|")[1] }));
-        Swal.fire({title: 'Gravando na planilha...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) {
+            return Swal.fire('Erro', 'Preencha a matrícula e escolha um horário.', 'warning');
+        }
+        
+        const dr = selecionados.map(s => { const [d, t] = s.split("|"); return { data: d, turno: t }; });
+        Swal.fire({title: 'Gravando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
         fetch(`${API_URL}?acao=reservar&sala=${sala}&matricula=${mat}&nome=${nome}&reservas=${encodeURIComponent(JSON.stringify(dr))}`)
         .then(r => r.json()).then(res => {
             if(res.status === "sucesso") {
-                Swal.fire('Sucesso!', 'Horários reservados.', 'success').then(() => {
-                    selecionados = [];
-                    carregarAgenda(); // Puxa direto da planilha de novo!
+                Swal.fire('OK!', 'Agendamentos confirmados.', 'success').then(() => { 
+                    selecionados = []; 
+                    // O Segredo: Dá 1 segundo para o Google Sheets sincronizar o banco antes de recarregar a tela
+                    setTimeout(() => { carregarAgenda(); }, 1200);
                 });
-            } else Swal.fire('Ocupado', res.msg, 'error').then(() => carregarAgenda());
+            } else {
+                Swal.fire('Ocupado!', res.msg, 'error').then(() => carregarAgenda());
+            }
         });
     }
 
     function cancelarReserva(data, turno) {
-        const mat = document.getElementById('res-mat').value, sala = document.getElementById('res-sala-sel').value;
-        Swal.fire({ title: 'Cancelar Reserva?', text: `${data} (${turno})`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Sim' }).then(result => {
+        const mat = document.getElementById('res-mat').value;
+        const sala = document.getElementById('res-sala-sel').value;
+        
+        Swal.fire({
+            title: 'Desmarcar Horário?',
+            text: `Confirmar cancelamento dia ${data} (${turno})?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ed1c24',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sim',
+            cancelButtonText: 'Não'
+        }).then((result) => {
             if (result.isConfirmed) {
-                Swal.fire({title: 'Removendo da planilha...', didOpen: () => Swal.showLoading()});
+                Swal.fire({title: 'Limpando...', didOpen: () => Swal.showLoading()});
                 fetch(`${API_URL}?acao=cancelar&sala=${sala}&matricula=${mat}&data=${data}&turno=${turno}`)
                 .then(r => r.json()).then(res => {
                     if(res.status === "sucesso") {
-                        Swal.fire('Removido!', '', 'success').then(() => carregarAgenda());
-                    } else Swal.fire('Erro', res.msg, 'error');
+                        Swal.fire('Liberado!', 'Horário disponível novamente.', 'success').then(() => {
+                            // Mesmo segredo: 1 segundo para o Google processar a exclusão
+                            setTimeout(() => { carregarAgenda(); }, 1200);
+                        });
+                    } else {
+                        Swal.fire('Erro', res.msg, 'error');
+                    }
                 });
             }
         });
     }
 
-    function gerarRelatorio() {
-        Swal.fire({title: 'Calculando...', didOpen: () => Swal.showLoading()});
-        // Relatório pode usar o SCRIPT direto também pra ser real-time
-        fetch(`${API_URL}?acao=getAgenda&sala=ALL`) // Truquezinho no script poderia fazer isso, mas vou reciclar o GViz aqui pra n mexer muito, já que relatório não é crise ter 5 min de delay.
-        const URL_RES_GVIZ = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
-        fetch(`${URL_RES_GVIZ}&t=${Date.now()}`).then(r => r.text()).then(res => {
+    async function gerarRelatorio() {
+        Swal.fire({title: 'Calculando ocupação...', didOpen: () => Swal.showLoading()});
+        try {
+            const res = await fetch(`${URL_RESERVAS}&t=${Date.now()}`).then(r => r.text());
             const json = JSON.parse(res.substring(47).slice(0, -2));
-            let sCount = {}, iCount = {}, total = 0;
-            json.table.rows.forEach(r => {
-                if (!r.c || !r.c[1] || r.c[1].v === "Sala") return;
-                sCount[r.c[1].v] = (sCount[r.c[1].v] || 0) + 1;
-                let inst = r.c[3]?.v?.split(" ")[0] || "---";
-                iCount[inst] = (iCount[inst] || 0) + 1;
-                total++;
-            });
-            let html = `<p><b>Total:</b> ${total} reservas</p><hr>`;
-            Object.entries(sCount).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(s => html += `• ${s[0]}: ${s[1]}<br>`);
-            Swal.fire({ title: 'Uso dos Labs', html: html, icon: 'info' });
-        }).catch(e => Swal.fire('Erro no relatório'));
+            
+            let contagemSalas = {}, contagemInstrutores = {}, total = 0;
+
+            if(json.table.rows) {
+                json.table.rows.forEach(r => {
+                    if (!r.c || !r.c[1] || !r.c[1].v) return;
+                    let sala = String(r.c[1].v).trim();
+                    if (sala.toLowerCase() === "sala") return;
+                    
+                    let instrutor = r.c[3]?.v ? String(r.c[3].v).split(" ")[0] : "Desconhecido";
+                    
+                    contagemSalas[sala] = (contagemSalas[sala] || 0) + 1;
+                    contagemInstrutores[instrutor] = (contagemInstrutores[instrutor] || 0) + 1;
+                    total++;
+                });
+            }
+
+            let topSalas = Object.entries(contagemSalas).sort((a,b) => b[1] - a[1]);
+            let topInstrutores = Object.entries(contagemInstrutores).sort((a,b) => b[1] - a[1]);
+
+            let html = `<div style="text-align:left; font-size:15px; color:#333; line-height: 1.6;">`;
+            html += `<p style="text-align:center; font-size:18px;"><b>Total Geral:</b> <span style="color:var(--azul)">${total} reservas</span></p><hr>`;
+            html += `<b style="color:var(--vermelho)">🔥 Top Laboratórios:</b><br>`;
+            topSalas.slice(0,5).forEach(s => html += `• <b>${s[0]}</b>: ${s[1]} reservas<br>`);
+            html += `<br><b style="color:var(--azul)">🏆 Top Instrutores:</b><br>`;
+            topInstrutores.slice(0,5).forEach(i => html += `• <b>${i[0]}</b>: ${i[1]} reservas<br>`);
+            html += `</div>`;
+
+            Swal.fire({ title: 'Estatísticas', html: html, icon: 'info', confirmButtonColor: '#005696' });
+        } catch(e) { Swal.fire('Erro', 'Não foi possível gerar o relatório.', 'error'); }
     }
 
     function entrar() {
         const m = document.getElementById('mat-login').value;
-        if(!m) return Swal.fire('Matrícula!', '', 'warning');
-        Swal.fire({title: 'Validando na planilha...', didOpen: () => Swal.showLoading()});
+        if(!m) return Swal.fire('Atenção', 'Digite sua matrícula.', 'warning');
+        Swal.fire({title: 'Validando...', didOpen: () => Swal.showLoading()});
         fetch(`${API_URL}?acao=verificar&matricula=${m}&sala=${salaURL}`).then(r => r.json()).then(res => {
-            if(res.status === "sucesso" || res.status === "ja_logado") mostrar('tela-devolucao'), Swal.close();
-            else Swal.fire('Negado', res.msg, 'error');
+            if(res.status === "sucesso" || res.status === "ja_logado") { mostrar('tela-devolucao'); Swal.close(); }
+            else { Swal.fire('Acesso Negado', res.msg, 'error'); }
         });
     }
 
     function sair() {
         const m = document.getElementById('mat-login').value;
         fetch(`${API_URL}?acao=devolver&matricula=${m}&sala=${salaURL}&relato=${document.getElementById('relato').value}`)
-        .then(() => Swal.fire('Até logo!').then(() => location.reload()));
+        .then(() => Swal.fire('Saída Registrada', 'Chave devolvida!', 'success').then(() => location.reload()));
     }
 </script>
 </body>
