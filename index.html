@@ -10,24 +10,24 @@
         body { font-family: 'Segoe UI', sans-serif; background: var(--fundo); padding: 10px; margin: 0; display: flex; justify-content: center; }
         .card { background: white; padding: 20px; border-radius: 12px; max-width: 600px; width: 100%; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
         input, select, button { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; box-sizing: border-box; }
-        button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; }
+        button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { opacity: 0.9; }
         .hidden { display: none; }
         
-        /* O NOVO CALENDÁRIO */
         .calendario-container { margin-top: 15px; overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
         .tabela-grade { width: 100%; border-collapse: collapse; min-width: 500px; }
         .tabela-grade th, .tabela-grade td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 13px; }
         .tabela-grade th { background: #f0f0f0; color: #333; }
         .tabela-grade td.turno-label { font-weight: bold; background: #fafafa; color: var(--azul); width: 60px; }
         
-        /* Status das Células */
         .celula-livre { background: white; cursor: pointer; transition: 0.2s; }
         .celula-livre:hover { background: #eef5ff; }
         .celula-selecionada { background: #b3d4ff !important; font-weight: bold; color: var(--azul); border: 2px solid var(--azul) !important; cursor: pointer; }
         .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; cursor: not-allowed; font-size: 11px; }
         
-        .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); }
+        .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); font-size: 18px; text-transform: uppercase; }
         .nav-semana button { width: auto; padding: 5px 15px; margin: 0; font-size: 18px; }
+        .aviso-qr { color: #666; font-size: 14px; margin: 15px 0; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; }
     </style>
 </head>
 <body>
@@ -37,8 +37,12 @@
     <h3 id="txt-sala" style="color:var(--vermelho); margin: 10px 0;"></h3>
 
     <div id="tela-login">
+        <div id="aviso-qr" class="aviso-qr hidden">
+            📍 Acesso Remoto<br><span style="font-size:12px;">Para liberar a porta, utilize a câmera do celular no QR Code do laboratório.</span>
+        </div>
+        
         <input type="text" id="mat-login" placeholder="Sua Matrícula">
-        <button onclick="entrar()">ENTRAR NO LAB</button>
+        <button id="btn-entrar" onclick="entrar()">ENTRAR NO LAB</button>
         <button style="background:#6c757d; margin-top:15px;" onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
     </div>
 
@@ -58,11 +62,11 @@
         <div id="area-calendario" class="hidden">
             <div class="nav-semana">
                 <button onclick="mudarSemana(-1)">&#9664;</button>
-                <span id="texto-semana">Semana</span>
+                <span id="texto-semana">Mês</span>
                 <button onclick="mudarSemana(1)">&#9654;</button>
             </div>
             <div class="calendario-container">
-                <table class="tabela-grade" id="tabela-grade">
+                <table class="tabela-grade">
                     <thead id="grade-cabecalho"></thead>
                     <tbody id="grade-corpo"></tbody>
                 </table>
@@ -77,13 +81,25 @@
 
 <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
-    const salaURL = new URLSearchParams(window.location.search).get('sala') || "B5";
-    document.getElementById('txt-sala').innerText = "Lab: " + salaURL;
+    
+    const params = new URLSearchParams(window.location.search);
+    const salaURL = params.get('sala');
+    
+    // Lógica inteligente do QR Code
+    if (salaURL) {
+        document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
+    } else {
+        document.getElementById('txt-sala').innerText = "Central de Reservas";
+        document.getElementById('mat-login').classList.add('hidden');
+        document.getElementById('btn-entrar').classList.add('hidden');
+        document.getElementById('aviso-qr').classList.remove('hidden');
+    }
     
     let selecionados = [];
     let agendaAtual = [];
-    let dataInicioSemana = new Date(); // Começa hoje
+    let dataInicioSemana = new Date(); 
     const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const nomeMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
     const turnos = ['Manhã', 'Tarde', 'Noite'];
 
     function mostrar(id) {
@@ -105,6 +121,12 @@
             const sel = document.getElementById('res-sala-sel');
             sel.innerHTML = '<option value="">Selecione a Sala</option>';
             res.slice(1).forEach(s => sel.innerHTML += `<option value="${s[0]}">${s[1]}</option>`);
+            
+            // Se já veio com a sala na URL, auto-seleciona para agilizar
+            if(salaURL) {
+                sel.value = salaURL;
+                carregarAgenda();
+            }
         });
     }
 
@@ -113,7 +135,7 @@
         if(!sala) { document.getElementById('area-calendario').classList.add('hidden'); return; }
         
         document.getElementById('area-calendario').classList.remove('hidden');
-        Swal.fire({title: 'Buscando agenda...', didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Carregando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
         fetch(`${API_URL}?acao=getAgenda&sala=${sala}`).then(r => r.json()).then(dados => {
             agendaAtual = dados;
@@ -141,7 +163,6 @@
         let datasSemana = [];
         let htmlCabecalho = '<tr><th>Turno</th>';
         
-        // Gera os 7 dias a partir da data de início
         for(let i = 0; i < 7; i++) {
             let dataAt = new Date(dataInicioSemana);
             dataAt.setDate(dataAt.getDate() + i);
@@ -150,7 +171,9 @@
         }
         htmlCabecalho += '</tr>';
         cabecalho.innerHTML = htmlCabecalho;
-        document.getElementById('texto-semana').innerText = `${formatarDataBR(datasSemana[0])} a ${formatarDataBR(datasSemana[6])}`;
+        
+        // Exibe o MÊS e ANO atual no topo do calendário
+        document.getElementById('texto-semana').innerText = `${nomeMeses[datasSemana[0].getMonth()]} ${datasSemana[0].getFullYear()}`;
 
         let htmlCorpo = '';
         turnos.forEach(turno => {
@@ -160,7 +183,6 @@
                 const dataStr = formatarDataBR(dataAt);
                 const idCelula = `${dataStr}|${turno}`;
                 
-                // Verifica se está ocupado
                 const reserva = agendaAtual.find(r => r.data === dataStr && r.turno === turno);
                 const isSelecionado = selecionados.includes(idCelula);
                 
@@ -179,12 +201,9 @@
 
     function clicarCelula(id) {
         const index = selecionados.indexOf(id);
-        if (index > -1) {
-            selecionados.splice(index, 1);
-        } else {
-            selecionados.push(id);
-        }
-        renderizarGrade(); // Re-desenha a tabela para atualizar as cores
+        if (index > -1) selecionados.splice(index, 1);
+        else selecionados.push(id);
+        renderizarGrade(); 
     }
 
     function enviarReservas() {
@@ -194,20 +213,19 @@
         
         if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) return Swal.fire('Erro', 'Selecione os turnos válidos!', 'warning');
 
-        // Converte as seleções para o formato que o Google Script espera
         const dadosReserva = selecionados.map(s => {
             const [data, turno] = s.split("|");
             return { data: data, turno: turno };
         });
 
-        Swal.fire({title: 'Gravando...', didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Gravando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
         fetch(`${API_URL}?acao=reservar&sala=${sala}&matricula=${mat}&nome=${nome}&reservas=${encodeURIComponent(JSON.stringify(dadosReserva))}`)
         .then(r => r.json()).then(res => {
             if(res.status === "sucesso") {
                 Swal.fire('Sucesso!', 'Agendamentos confirmados.', 'success').then(() => {
                     selecionados = [];
-                    carregarAgenda(); // Recarrega a tela para mostrar em vermelho
+                    carregarAgenda(); 
                 });
             } else if(res.status === "conflito") {
                 Swal.fire('Conflito', 'Horários já ocupados: ' + res.msg, 'error').then(() => carregarAgenda());
