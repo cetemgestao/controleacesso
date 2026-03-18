@@ -10,7 +10,8 @@
         body { font-family: 'Segoe UI', sans-serif; background: var(--fundo); padding: 10px; margin: 0; display: flex; justify-content: center; }
         .card { background: white; padding: 20px; border-radius: 12px; max-width: 600px; width: 100%; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
         input, select, button, textarea { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; box-sizing: border-box; }
-        button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; }
+        button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { opacity: 0.9; }
         .hidden { display: none; }
         .calendario-container { margin-top: 15px; overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
         .tabela-grade { width: 100%; border-collapse: collapse; min-width: 500px; }
@@ -19,8 +20,8 @@
         .turno-label { font-weight: bold; background: #fafafa; color: var(--azul); width: 60px; }
         .celula-livre { background: white; cursor: pointer; transition: 0.2s; }
         .celula-livre:hover { background: #f0f7ff; }
-        .celula-selecionada { background: #b3d4ff !important; color: var(--azul); font-weight: bold; border: 2px solid var(--azul) !important; }
-        .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; font-size: 10px; line-height: 1.2; }
+        .celula-selecionada { background: #b3d4ff !important; color: var(--azul); font-weight: bold; border: 2px solid var(--azul) !important; cursor: pointer; }
+        .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; font-size: 10px; line-height: 1.2; cursor: not-allowed; }
         .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); }
         .nav-semana button { width: auto; padding: 5px 15px; margin: 0; }
         .aviso-qr { color: #666; font-size: 13px; margin: 10px 0; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; }
@@ -75,6 +76,7 @@
     const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U";
     const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
     
+    // Removido o filtro problemático do GViz
     const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
     const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
     const URL_RESERVAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
@@ -110,7 +112,7 @@
 
     async function abrirReserva() {
         mostrar('tela-reserva');
-        Swal.fire({title: 'Sincronizando...', didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Carregando dados...', didOpen: () => Swal.showLoading()});
         try {
             const [resS, resI] = await Promise.all([
                 fetch(`${URL_SALAS}&t=${Date.now()}`).then(r => r.text()),
@@ -121,57 +123,66 @@
             const jS = JSON.parse(resS.substring(47).slice(0, -2));
             const sel = document.getElementById('res-sala-sel');
             sel.innerHTML = '<option value="">Selecione a Sala</option>';
-            jS.table.rows.slice(1).forEach(r => { if(r.c[0]?.v) sel.innerHTML += `<option value="${r.c[0].v}">${r.c[1]?.v}</option>`; });
+            jS.table.rows.forEach(r => { 
+                if(r.c && r.c[0]?.v && String(r.c[0].v).toLowerCase() !== "sala") {
+                    sel.innerHTML += `<option value="${r.c[0].v}">${r.c[1]?.v}</option>`; 
+                }
+            });
             if(salaURL) { sel.value = salaURL; carregarAgenda(); } else { Swal.close(); }
-        } catch(e) { Swal.fire('Erro', 'Verifique se a planilha está pública!', 'error'); }
+        } catch(e) { Swal.fire('Erro', 'Falha ao baixar os instrutores.', 'error'); }
     }
 
     async function carregarAgenda() {
-        const sala = document.getElementById('res-sala-sel').value;
-        if(!sala) return;
+        const salaSelecionada = document.getElementById('res-sala-sel').value;
+        if(!salaSelecionada) return;
         document.getElementById('area-calendario').classList.remove('hidden');
         document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8">Atualizando grade...</td></tr>';
         
         try {
-            const query = encodeURIComponent(`select * where B = '${sala}'`);
-            const res = await fetch(`${URL_RESERVAS}&tq=${query}&t=${Date.now()}`).then(r => r.text());
+            // BAIXA TUDO DIRETO E FILTRA NO JS PARA EVITAR BUGS DO GVIZ
+            const res = await fetch(`${URL_RESERVAS}&t=${Date.now()}`).then(r => r.text());
             const json = JSON.parse(res.substring(47).slice(0, -2));
             
             agendaAtual = [];
             if(json.table.rows) {
-                agendaAtual = json.table.rows.map(r => {
-                    // TRADUTOR DE DATAS GVIZ
+                json.table.rows.forEach(r => {
+                    // Previne quebra de código se a linha estiver corrompida
+                    if (!r.c || !r.c[1] || !r.c[1].v) return;
+
+                    let salaBD = String(r.c[1].v).trim();
+                    if (salaBD !== salaSelecionada) return; // Filtra só as reservas desta sala
+
                     let dRaw = r.c[0]?.f || r.c[0]?.v || "";
                     let dTratada = String(dRaw).replace(/['"]/g, "").trim();
                     
                     if (dTratada.includes("Date(")) {
                         let p = dTratada.match(/\d+/g);
-                        // p[0]=ano, p[1]=mês(0-11), p[2]=dia
-                        dTratada = p[2].padStart(2,'0') + "/" + (parseInt(p[1]) + 1).toString().padStart(2,'0') + "/" + p[0];
+                        if(p && p.length >= 3) {
+                            dTratada = p[2].padStart(2,'0') + "/" + (parseInt(p[1]) + 1).toString().padStart(2,'0') + "/" + p[0];
+                        }
                     } else if (dTratada.includes("-")) {
                         let p = dTratada.split("T")[0].split("-");
-                        dTratada = `${p[2].padStart(2,'0')}/${p[1].padStart(2,'0')}/${p[0]}`;
+                        if(p.length >= 3) dTratada = `${p[2].padStart(2,'0')}/${p[1].padStart(2,'0')}/${p[0]}`;
                     }
                     
-                    return { 
+                    agendaAtual.push({ 
                         data: dTratada, 
-                        instrutor: r.c[3]?.v ? String(r.c[3].v).split(" ")[0] : "", 
-                        turno: r.c[4]?.v ? String(r.c[4].v).trim() : "" 
-                    };
+                        instrutor: r.c[3]?.v ? String(r.c[3].v).split(" ")[0] : "Ocupado", 
+                        turno: r.c[4]?.v ? String(r.c[4].v).trim().toUpperCase() : "" 
+                    });
                 });
             }
             renderizarGrade();
-        } catch(e) { console.error("Erro na agenda:", e); }
+        } catch(e) { 
+            console.error("Erro Agenda:", e);
+            Swal.fire('Erro', 'Não foi possível ler as reservas.', 'error'); 
+        }
     }
 
     function renderizarGrade() {
         const cab = document.getElementById('grade-cabecalho'), cor = document.getElementById('grade-corpo');
         let dSemana = [], hCab = '<tr><th>Turno</th>';
         
-        // Fixa a data atual para comparação
-        const hojeObj = new Date();
-        const hojeFormatado = String(hojeObj.getDate()).padStart(2,'0') + "/" + String(hojeObj.getMonth()+1).padStart(2,'0') + "/" + hojeObj.getFullYear();
-
         for(let i=0; i<7; i++) {
             let dAt = new Date(dataInicioSemana); dAt.setDate(dAt.getDate() + i); dSemana.push(dAt);
             hCab += `<th>${String(dAt.getDate()).padStart(2,'0')}/${String(dAt.getMonth()+1).padStart(2,'0')}<br>${diasSemana[dAt.getDay()]}</th>`;
@@ -185,12 +196,12 @@
             dSemana.forEach(dat => {
                 const dStr = String(dat.getDate()).padStart(2,'0') + "/" + String(dat.getMonth()+1).padStart(2,'0') + "/" + dat.getFullYear();
                 
-                // Busca exata na agenda
-                const reserva = agendaAtual.find(r => r.data === dStr && r.turno === t);
+                // Checa com uppercase para não dar bug se o turno foi escrito "manhã" minúsculo no Google
+                const reserva = agendaAtual.find(r => r.data === dStr && r.turno === t.toUpperCase());
                 const sel = selecionados.includes(`${dStr}|${t}`);
                 
                 if (reserva) { 
-                    hCor += `<td class="celula-ocupada">OCUPADO<br>${reserva.instrutor}</td>`; 
+                    hCor += `<td class="celula-ocupada">X<br>${reserva.instrutor}</td>`; 
                 } else if (sel) { 
                     hCor += `<td class="celula-selecionada" onclick="clicarCelula('${dStr}|${t}')">✓</td>`; 
                 } else { 
@@ -211,33 +222,44 @@
     function mudarSemana(d) { dataInicioSemana.setDate(dataInicioSemana.getDate() + (d * 7)); renderizarGrade(); }
 
     function enviarReservas() {
-        const mat = document.getElementById('res-mat').value, nome = document.getElementById('res-nome').value, sala = document.getElementById('res-sala-sel').value;
-        if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) return Swal.fire('Erro', 'Verifique os campos!', 'warning');
+        const mat = document.getElementById('res-mat').value;
+        const nome = document.getElementById('res-nome').value;
+        const sala = document.getElementById('res-sala-sel').value;
+        
+        if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) {
+            return Swal.fire('Erro', 'Preencha a matrícula e escolha um horário.', 'warning');
+        }
         
         const dr = selecionados.map(s => { const [d, t] = s.split("|"); return { data: d, turno: t }; });
-        Swal.fire({title: 'Gravando...', didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Salvando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
         fetch(`${API_URL}?acao=reservar&sala=${sala}&matricula=${mat}&nome=${nome}&reservas=${encodeURIComponent(JSON.stringify(dr))}`)
         .then(r => r.json()).then(res => {
-            if(res.status === "sucesso") Swal.fire('OK!', 'Reservas salvas!', 'success').then(() => { selecionados = []; carregarAgenda(); });
-            else Swal.fire('Ocupado', res.msg, 'error').then(() => carregarAgenda());
+            if(res.status === "sucesso") {
+                Swal.fire('OK!', 'Agendamentos confirmados.', 'success').then(() => { 
+                    selecionados = []; 
+                    carregarAgenda(); 
+                });
+            } else {
+                Swal.fire('Ocupado!', res.msg, 'error').then(() => carregarAgenda());
+            }
         });
     }
 
     function entrar() {
         const m = document.getElementById('mat-login').value;
-        if(!m) return;
+        if(!m) return Swal.fire('Atenção', 'Digite sua matrícula.', 'warning');
         Swal.fire({title: 'Validando...', didOpen: () => Swal.showLoading()});
         fetch(`${API_URL}?acao=verificar&matricula=${m}&sala=${salaURL}`).then(r => r.json()).then(res => {
             if(res.status === "sucesso" || res.status === "ja_logado") { mostrar('tela-devolucao'); Swal.close(); }
-            else { Swal.fire('Negado', res.msg, 'error'); }
+            else { Swal.fire('Acesso Negado', res.msg, 'error'); }
         });
     }
 
     function sair() {
         const m = document.getElementById('mat-login').value;
         fetch(`${API_URL}?acao=devolver&matricula=${m}&sala=${salaURL}&relato=${document.getElementById('relato').value}`)
-        .then(() => Swal.fire('Saída OK', 'Até logo!', 'success').then(() => location.reload()));
+        .then(() => Swal.fire('Saída Registrada', 'Chave devolvida!', 'success').then(() => location.reload()));
     }
 </script>
 </body>
