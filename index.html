@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENAI - Lab Control</title>
+    <title>SENAI - Lab Control Turbo</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f4f7f6; }
@@ -40,7 +40,6 @@
         <div id="aviso-qr" class="aviso-qr hidden">
             📍 Central de Reservas<br><span style="font-size:12px;">Para destravar a porta, utilize a câmera do celular no QR Code do laboratório.</span>
         </div>
-        
         <input type="text" id="mat-login" placeholder="Sua Matrícula">
         <button id="btn-entrar" onclick="entrar()">ENTRAR NO LAB</button>
         <button style="background:#6c757d; margin-top:15px;" onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
@@ -57,7 +56,10 @@
             <input type="text" id="res-mat" placeholder="Matrícula" oninput="buscarNome()" style="flex: 1;">
             <input type="text" id="res-nome" placeholder="Nome" style="background:#eee; flex: 2;" readonly>
         </div>
-        <select id="res-sala-sel" onchange="carregarAgenda()"></select>
+        
+        <select id="res-sala-sel" onchange="carregarAgenda()">
+            <option value="">Carregando salas...</option>
+        </select>
         
         <div id="area-calendario" class="hidden">
             <div class="nav-semana">
@@ -74,13 +76,21 @@
             <p style="font-size:12px; color:#555; text-align:left; margin-top:5px;">* Clique nos quadros brancos para selecionar.</p>
         </div>
 
-        <button onclick="enviarReservas()" style="margin-top:15px;">CONFIRMAR AGENDAMENTOS SELECIONADOS</button>
+        <button onclick="enviarReservas()" style="margin-top:15px;">CONFIRMAR AGENDAMENTOS</button>
         <button style="background:#777" onclick="location.reload()">VOLTAR</button>
     </div>
 </div>
 
 <script>
+    // ======= CONFIGURAÇÃO GViz =======
+    const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U"; // Ex: 1MjfQ5NQ3BvQAWzmIxjoqDBmeQdAn9EREGjqnj2EAR1I
     const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
+    
+    // Links Diretos do Google
+    const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
+    const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
+    const URL_RESERVAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
+    // =================================
     
     const params = new URLSearchParams(window.location.search);
     const salaURL = params.get('sala');
@@ -96,7 +106,7 @@
     
     let selecionados = [];
     let agendaAtual = [];
-    let listaInstrutores = []; // Guarda os instrutores na memória do celular
+    let listaInstrutores = []; 
     
     let dataInicioSemana = new Date(); 
     const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -108,55 +118,87 @@
         document.getElementById(id).classList.remove('hidden');
     }
 
-    // NOVA BUSCA INSTANTÂNEA
     function buscarNome() {
         const mat = document.getElementById('res-mat').value;
-        if(mat.length === 0) { document.getElementById('res-nome').value = ""; return; }
+        const inputNome = document.getElementById('res-nome');
+        if(mat.length === 0) { inputNome.value = ""; return; }
         
-        // Procura na memória local sem acessar a internet
-        const pessoa = listaInstrutores.find(i => i[0].toString() === mat.toString());
-        document.getElementById('res-nome').value = pessoa ? pessoa[1] : "Não encontrado";
+        const pessoa = listaInstrutores.find(i => i.mat === mat.toString());
+        inputNome.value = pessoa ? pessoa.nome : "Não encontrado";
     }
 
-    function abrirReserva() {
+    async function abrirReserva() {
         mostrar('tela-reserva');
-        Swal.fire({title: 'Carregando Sistema...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Carregando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
-        // Faz apenas UM download contendo Salas e Instrutores
-        fetch(`${API_URL}?acao=getDadosIniciais`).then(r => r.json()).then(res => {
-            listaInstrutores = res.instrutores;
-            
+        try {
+            // BAIXA SALAS E INSTRUTORES SIMULTANEAMENTE DA PLANILHA (MUITO RÁPIDO)
+            const [resSalas, resInst] = await Promise.all([
+                fetch(`${URL_SALAS}&t=${Date.now()}`).then(r => r.text()),
+                fetch(`${URL_INSTRUTORES}&t=${Date.now()}`).then(r => r.text())
+            ]);
+
+            // Formata Instrutores
+            const jsonInst = JSON.parse(resInst.substring(47).slice(0, -2));
+            if(jsonInst.table.rows.length > 1) {
+                listaInstrutores = jsonInst.table.rows.slice(1).map(r => {
+                    return { mat: r.c[0]?.v?.toString(), nome: r.c[1]?.v };
+                }).filter(i => i.mat);
+            }
+
+            // Formata Salas
+            const jsonSalas = JSON.parse(resSalas.substring(47).slice(0, -2));
             const sel = document.getElementById('res-sala-sel');
             sel.innerHTML = '<option value="">Selecione a Sala</option>';
-            res.salas.slice(1).forEach(s => sel.innerHTML += `<option value="${s[0]}">${s[1]}</option>`);
-            
-            if(salaURL) {
-                sel.value = salaURL;
-                carregarAgenda(); // Puxa os vermelhos
-            } else {
-                Swal.close();
+            if(jsonSalas.table.rows.length > 1) {
+                jsonSalas.table.rows.slice(1).forEach(r => {
+                    if(r.c[0]?.v) sel.innerHTML += `<option value="${r.c[0].v}">${r.c[1]?.v}</option>`;
+                });
             }
-        });
+            
+            buscarNome();
+            if(salaURL) { sel.value = salaURL; carregarAgenda(); } 
+            else { Swal.close(); }
+
+        } catch(e) {
+            Swal.fire('Erro', 'Falha ao baixar dados. Verifique o ID da Planilha.', 'error');
+        }
     }
 
-    function carregarAgenda() {
+    async function carregarAgenda() {
         const sala = document.getElementById('res-sala-sel').value;
         if(!sala) { document.getElementById('area-calendario').classList.add('hidden'); return; }
         
         document.getElementById('area-calendario').classList.remove('hidden');
-        Swal.fire({title: 'Buscando agenda...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8">Atualizando...</td></tr>';
         
-        fetch(`${API_URL}?acao=getAgenda&sala=${sala}`).then(r => r.json()).then(dados => {
-            agendaAtual = dados;
+        try {
+            // USA QUERY SQL DO GVIZ PARA BAIXAR APENAS AS RESERVAS DESTA SALA
+            const querySegura = encodeURIComponent(`select * where B = '${sala}'`);
+            const res = await fetch(`${URL_RESERVAS}&tq=${querySegura}&t=${Date.now()}`).then(r => r.text());
+            const json = JSON.parse(res.substring(47).slice(0, -2));
+            
+            agendaAtual = [];
+            if(json.table.rows.length > 0) {
+                agendaAtual = json.table.rows.map(r => {
+                    return {
+                        data: r.c[0]?.f || r.c[0]?.v, // f=formatada, v=valor puro
+                        instrutor: r.c[3]?.v?.split(" ")[0],
+                        turno: r.c[4]?.v
+                    };
+                }).filter(r => r.data && r.data.includes("/"));
+            }
+            
+            // Limpa as aspas simples ('18/03/2026) se vierem do banco
+            agendaAtual.forEach(a => { if(a.data.startsWith("'")) a.data = a.data.substring(1); });
+
             renderizarGrade();
-            Swal.close();
-        });
+        } catch(e) {
+            Swal.fire('Erro', 'Falha ao carregar a agenda.', 'error');
+        }
     }
 
-    function mudarSemana(dias) {
-        dataInicioSemana.setDate(dataInicioSemana.getDate() + (dias * 7));
-        renderizarGrade();
-    }
+    function mudarSemana(dias) { dataInicioSemana.setDate(dataInicioSemana.getDate() + (dias * 7)); renderizarGrade(); }
 
     function formatarDataBR(dataObj) {
         const d = String(dataObj.getDate()).padStart(2, '0');
@@ -186,7 +228,6 @@
         let htmlCorpo = '';
         turnos.forEach(turno => {
             htmlCorpo += `<tr><td class="turno-label">${turno}</td>`;
-            
             datasSemana.forEach(dataAt => {
                 const dataStr = formatarDataBR(dataAt);
                 const idCelula = `${dataStr}|${turno}`;
@@ -194,13 +235,9 @@
                 const reserva = agendaAtual.find(r => r.data === dataStr && r.turno === turno);
                 const isSelecionado = selecionados.includes(idCelula);
                 
-                if (reserva) {
-                    htmlCorpo += `<td class="celula-ocupada">X<br>${reserva.instrutor}</td>`;
-                } else if (isSelecionado) {
-                    htmlCorpo += `<td class="celula-selecionada" onclick="clicarCelula('${idCelula}')">✓</td>`;
-                } else {
-                    htmlCorpo += `<td class="celula-livre" onclick="clicarCelula('${idCelula}')"></td>`;
-                }
+                if (reserva) { htmlCorpo += `<td class="celula-ocupada">X<br>${reserva.instrutor}</td>`; } 
+                else if (isSelecionado) { htmlCorpo += `<td class="celula-selecionada" onclick="clicarCelula('${idCelula}')">✓</td>`; } 
+                else { htmlCorpo += `<td class="celula-livre" onclick="clicarCelula('${idCelula}')"></td>`; }
             });
             htmlCorpo += '</tr>';
         });
@@ -209,8 +246,7 @@
 
     function clicarCelula(id) {
         const index = selecionados.indexOf(id);
-        if (index > -1) selecionados.splice(index, 1);
-        else selecionados.push(id);
+        if (index > -1) selecionados.splice(index, 1); else selecionados.push(id);
         renderizarGrade(); 
     }
 
@@ -221,10 +257,7 @@
         
         if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) return Swal.fire('Erro', 'Selecione os turnos válidos!', 'warning');
 
-        const dadosReserva = selecionados.map(s => {
-            const [data, turno] = s.split("|");
-            return { data: data, turno: turno };
-        });
+        const dadosReserva = selecionados.map(s => { const [data, turno] = s.split("|"); return { data: data, turno: turno }; });
 
         Swal.fire({title: 'Gravando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
@@ -232,14 +265,11 @@
         .then(r => r.json()).then(res => {
             if(res.status === "sucesso") {
                 Swal.fire('Sucesso!', 'Agendamentos confirmados.', 'success').then(() => {
-                    selecionados = [];
-                    carregarAgenda(); 
+                    selecionados = []; carregarAgenda(); 
                 });
             } else if(res.status === "conflito") {
                 Swal.fire('Conflito', 'Horários já ocupados: ' + res.msg, 'error').then(() => carregarAgenda());
-            } else {
-                Swal.fire('Erro', res.msg, 'error');
-            }
+            } else { Swal.fire('Erro', res.msg, 'error'); }
         });
     }
 
