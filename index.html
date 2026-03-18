@@ -17,9 +17,10 @@
         .tabela-grade th, .tabela-grade td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 12px; }
         .tabela-grade th { background: #f0f0f0; }
         .turno-label { font-weight: bold; background: #fafafa; color: var(--azul); width: 60px; }
-        .celula-livre { background: white; cursor: pointer; }
+        .celula-livre { background: white; cursor: pointer; transition: 0.2s; }
+        .celula-livre:hover { background: #f0f7ff; }
         .celula-selecionada { background: #b3d4ff !important; color: var(--azul); font-weight: bold; border: 2px solid var(--azul) !important; }
-        .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; font-size: 10px; }
+        .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; font-size: 10px; line-height: 1.2; }
         .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); }
         .nav-semana button { width: auto; padding: 5px 15px; margin: 0; }
         .aviso-qr { color: #666; font-size: 13px; margin: 10px 0; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; }
@@ -33,7 +34,7 @@
 
     <div id="tela-login">
         <div id="aviso-qr" class="aviso-qr hidden">
-            📍 Central de Reservas<br>Leia o QR Code na porta do laboratório para registrar entrada.
+            📍 Central de Reservas<br>Utilize o QR Code da porta para registrar entrada.
         </div>
         <input type="text" id="mat-login" placeholder="Sua Matrícula">
         <button id="btn-entrar" onclick="entrar()">ENTRAR NO LAB</button>
@@ -81,7 +82,6 @@
     const params = new URLSearchParams(window.location.search);
     const salaURL = params.get('sala');
 
-    // CORREÇÃO QR CODE: Só mostra a sala se ela vier no link
     if (salaURL) {
         document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
     } else {
@@ -110,69 +110,92 @@
 
     async function abrirReserva() {
         mostrar('tela-reserva');
-        Swal.fire({title: 'Acessando dados...', didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Sincronizando...', didOpen: () => Swal.showLoading()});
         try {
             const [resS, resI] = await Promise.all([
                 fetch(`${URL_SALAS}&t=${Date.now()}`).then(r => r.text()),
                 fetch(`${URL_INSTRUTORES}&t=${Date.now()}`).then(r => r.text())
             ]);
             const jI = JSON.parse(resI.substring(47).slice(0, -2));
-            listaInstrutores = jI.table.rows.map(r => ({ mat: r.c[0]?.v?.toString(), nome: r.c[1]?.v }));
+            listaInstrutores = jI.table.rows.map(r => ({ mat: r.c[0]?.v?.toString() || "", nome: r.c[1]?.v || "" }));
             const jS = JSON.parse(resS.substring(47).slice(0, -2));
             const sel = document.getElementById('res-sala-sel');
             sel.innerHTML = '<option value="">Selecione a Sala</option>';
             jS.table.rows.slice(1).forEach(r => { if(r.c[0]?.v) sel.innerHTML += `<option value="${r.c[0].v}">${r.c[1]?.v}</option>`; });
             if(salaURL) { sel.value = salaURL; carregarAgenda(); } else { Swal.close(); }
-        } catch(e) { Swal.fire('Erro', 'Planilha não está pública!', 'error'); }
+        } catch(e) { Swal.fire('Erro', 'Verifique se a planilha está pública!', 'error'); }
     }
 
     async function carregarAgenda() {
         const sala = document.getElementById('res-sala-sel').value;
         if(!sala) return;
         document.getElementById('area-calendario').classList.remove('hidden');
-        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8">Carregando...</td></tr>';
+        document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8">Atualizando grade...</td></tr>';
+        
         try {
             const query = encodeURIComponent(`select * where B = '${sala}'`);
             const res = await fetch(`${URL_RESERVAS}&tq=${query}&t=${Date.now()}`).then(r => r.text());
             const json = JSON.parse(res.substring(47).slice(0, -2));
             
-            agendaAtual = json.table.rows.map(r => {
-                let dRaw = r.c[0]?.f || r.c[0]?.v || "";
-                let dTratada = String(dRaw).replace(/['"]/g, "").trim();
-                
-                // TRADUTOR DE DATA (Resolve o problema de não mostrar)
-                if(dTratada.includes("Date(")) {
-                    let p = dTratada.match(/\d+/g);
-                    dTratada = p[2].padStart(2,'0') + "/" + (parseInt(p[1])+1).toString().padStart(2,'0') + "/" + p[0];
-                } else if(dTratada.includes("-")) {
-                    let p = dTratada.split("-");
-                    dTratada = p[2].padStart(2,'0') + "/" + p[1].padStart(2,'0') + "/" + p[0];
-                }
-                return { data: dTratada, instrutor: r.c[3]?.v ? r.c[3].v.toString().split(" ")[0] : "", turno: r.c[4]?.v?.toString().trim() };
-            });
+            agendaAtual = [];
+            if(json.table.rows) {
+                agendaAtual = json.table.rows.map(r => {
+                    // TRADUTOR DE DATAS GVIZ
+                    let dRaw = r.c[0]?.f || r.c[0]?.v || "";
+                    let dTratada = String(dRaw).replace(/['"]/g, "").trim();
+                    
+                    if (dTratada.includes("Date(")) {
+                        let p = dTratada.match(/\d+/g);
+                        // p[0]=ano, p[1]=mês(0-11), p[2]=dia
+                        dTratada = p[2].padStart(2,'0') + "/" + (parseInt(p[1]) + 1).toString().padStart(2,'0') + "/" + p[0];
+                    } else if (dTratada.includes("-")) {
+                        let p = dTratada.split("T")[0].split("-");
+                        dTratada = `${p[2].padStart(2,'0')}/${p[1].padStart(2,'0')}/${p[0]}`;
+                    }
+                    
+                    return { 
+                        data: dTratada, 
+                        instrutor: r.c[3]?.v ? String(r.c[3].v).split(" ")[0] : "", 
+                        turno: r.c[4]?.v ? String(r.c[4].v).trim() : "" 
+                    };
+                });
+            }
             renderizarGrade();
-        } catch(e) { console.error(e); }
+        } catch(e) { console.error("Erro na agenda:", e); }
     }
 
     function renderizarGrade() {
         const cab = document.getElementById('grade-cabecalho'), cor = document.getElementById('grade-corpo');
         let dSemana = [], hCab = '<tr><th>Turno</th>';
+        
+        // Fixa a data atual para comparação
+        const hojeObj = new Date();
+        const hojeFormatado = String(hojeObj.getDate()).padStart(2,'0') + "/" + String(hojeObj.getMonth()+1).padStart(2,'0') + "/" + hojeObj.getFullYear();
+
         for(let i=0; i<7; i++) {
             let dAt = new Date(dataInicioSemana); dAt.setDate(dAt.getDate() + i); dSemana.push(dAt);
             hCab += `<th>${String(dAt.getDate()).padStart(2,'0')}/${String(dAt.getMonth()+1).padStart(2,'0')}<br>${diasSemana[dAt.getDay()]}</th>`;
         }
         cab.innerHTML = hCab + '</tr>';
         document.getElementById('texto-semana').innerText = `${nomeMeses[dSemana[0].getMonth()]} ${dSemana[0].getFullYear()}`;
+        
         let hCor = '';
         turnos.forEach(t => {
             hCor += `<tr><td class="turno-label">${t}</td>`;
             dSemana.forEach(dat => {
                 const dStr = String(dat.getDate()).padStart(2,'0') + "/" + String(dat.getMonth()+1).padStart(2,'0') + "/" + dat.getFullYear();
-                const res = agendaAtual.find(r => r.data === dStr && r.turno === t);
+                
+                // Busca exata na agenda
+                const reserva = agendaAtual.find(r => r.data === dStr && r.turno === t);
                 const sel = selecionados.includes(`${dStr}|${t}`);
-                if (res) hCor += `<td class="celula-ocupada">X<br>${res.instrutor}</td>`;
-                else if (sel) hCor += `<td class="celula-selecionada" onclick="clicarCelula('${dStr}|${t}')">✓</td>`;
-                else hCor += `<td class="celula-livre" onclick="clicarCelula('${dStr}|${t}')"></td>`;
+                
+                if (reserva) { 
+                    hCor += `<td class="celula-ocupada">OCUPADO<br>${reserva.instrutor}</td>`; 
+                } else if (sel) { 
+                    hCor += `<td class="celula-selecionada" onclick="clicarCelula('${dStr}|${t}')">✓</td>`; 
+                } else { 
+                    hCor += `<td class="celula-livre" onclick="clicarCelula('${dStr}|${t}')"></td>`; 
+                }
             });
             hCor += '</tr>';
         });
@@ -189,13 +212,15 @@
 
     function enviarReservas() {
         const mat = document.getElementById('res-mat').value, nome = document.getElementById('res-nome').value, sala = document.getElementById('res-sala-sel').value;
-        if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) return Swal.fire('Erro', 'Verifique os dados!', 'warning');
+        if(selecionados.length === 0 || !mat || !sala || nome.includes("Não")) return Swal.fire('Erro', 'Verifique os campos!', 'warning');
+        
         const dr = selecionados.map(s => { const [d, t] = s.split("|"); return { data: d, turno: t }; });
-        Swal.fire({title: 'Salvando...', didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Gravando...', didOpen: () => Swal.showLoading()});
+        
         fetch(`${API_URL}?acao=reservar&sala=${sala}&matricula=${mat}&nome=${nome}&reservas=${encodeURIComponent(JSON.stringify(dr))}`)
         .then(r => r.json()).then(res => {
-            if(res.status === "sucesso") Swal.fire('OK!', 'Reservas feitas.', 'success').then(() => { selecionados = []; carregarAgenda(); });
-            else Swal.fire('Erro', res.msg, 'error');
+            if(res.status === "sucesso") Swal.fire('OK!', 'Reservas salvas!', 'success').then(() => { selecionados = []; carregarAgenda(); });
+            else Swal.fire('Ocupado', res.msg, 'error').then(() => carregarAgenda());
         });
     }
 
@@ -205,14 +230,14 @@
         Swal.fire({title: 'Validando...', didOpen: () => Swal.showLoading()});
         fetch(`${API_URL}?acao=verificar&matricula=${m}&sala=${salaURL}`).then(r => r.json()).then(res => {
             if(res.status === "sucesso" || res.status === "ja_logado") { mostrar('tela-devolucao'); Swal.close(); }
-            else { Swal.fire('Erro', res.msg, 'error'); }
+            else { Swal.fire('Negado', res.msg, 'error'); }
         });
     }
 
     function sair() {
         const m = document.getElementById('mat-login').value;
         fetch(`${API_URL}?acao=devolver&matricula=${m}&sala=${salaURL}&relato=${document.getElementById('relato').value}`)
-        .then(() => Swal.fire('Saída OK', 'Até mais!', 'success').then(() => location.reload()));
+        .then(() => Swal.fire('Saída OK', 'Até logo!', 'success').then(() => location.reload()));
     }
 </script>
 </body>
