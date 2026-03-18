@@ -3,79 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENAI - Lab Control</title>
+    <title>SENAI Lab - Rápido</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f4f4f4; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--fundo); padding: 15px; display: flex; justify-content: center; }
-        .card { background: white; padding: 25px; border-radius: 12px; width: 100%; max-width: 420px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); text-align: center; }
-        input, select, button, textarea { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 15px; }
+        :root { --azul: #005696; --vermelho: #ed1c24; }
+        body { font-family: sans-serif; background: #f0f2f5; padding: 15px; display: flex; justify-content: center; }
+        .card { background: white; padding: 20px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
+        input, select, button, textarea { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; box-sizing: border-box; }
         button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; }
-        .btn-ver { background: #555; font-size: 13px; }
+        .btn-ver { background: #6c757d; font-size: 14px; }
         .hidden { display: none; }
-        .agenda-box { background: #fdfdfd; padding: 10px; border: 1px dashed #bbb; border-radius: 6px; max-height: 180px; overflow-y: auto; text-align: left; margin: 10px 0; }
-        .agenda-item { font-size: 12px; border-bottom: 1px solid #eee; padding: 5px 0; color: #333; }
+        .agenda-box { background: #fafafa; border: 1px solid #ddd; padding: 10px; border-radius: 8px; max-height: 120px; overflow-y: auto; text-align: left; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8c/SENAI_Logo.png" style="width:140px; margin-bottom: 10px;">
-    <h3 id="txt-sala" style="color:var(--vermelho); margin-top: 0;"></h3>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/8/8c/SENAI_Logo.png" style="width:130px; margin-bottom:10px;">
+    <h3 id="txt-sala" style="color:var(--vermelho)"></h3>
 
     <div id="tela-login">
         <input type="text" id="mat-login" placeholder="Sua Matrícula">
-        <button onclick="entrar()">LIBERAR ACESSO</button>
+        <button onclick="entrar()">ENTRAR NO LAB</button>
         <button class="btn-ver" onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
     </div>
 
     <div id="tela-devolucao" class="hidden">
         <h2 style="color:var(--azul)">Sessão Ativa</h2>
-        <textarea id="relato" placeholder="Alguma observação sobre a sala?"></textarea>
+        <textarea id="relato" placeholder="Relato (Opcional)"></textarea>
         <button style="background:var(--vermelho)" onclick="sair()">DEVOLVER CHAVE</button>
     </div>
 
     <div id="tela-reserva" class="hidden">
         <h3>Agendamento</h3>
-        <input type="text" id="res-mat" placeholder="Sua Matrícula" onblur="buscarNome()">
-        <input type="text" id="res-nome" placeholder="Nome do Instrutor" style="background:#f0f0f0" readonly>
-        
+        <input type="text" id="res-mat" placeholder="Matrícula" oninput="buscarNome()">
+        <input type="text" id="res-nome" placeholder="Nome" style="background:#eee" readonly>
         <select id="res-sala-sel" onchange="verAgenda()"></select>
-
-        <div id="box-agenda" class="agenda-box">
-            <p style="font-size:11px; color:#999;">Selecione a sala para carregar a agenda...</p>
-        </div>
-
-        <p style="font-size:11px; color:blue; text-align:left; margin:0;">Datas (ex: 17/03/2026, 18/03/2026):</p>
-        <input type="text" id="res-datas" placeholder="Clique aqui e digite as datas">
-        
+        <div id="box-agenda" class="agenda-box"><p style="font-size:12px">Agenda...</p></div>
+        <input type="text" id="res-datas" placeholder="Datas (Ex: 17/03/2026, 18/03/2026)">
         <select id="res-turno"><option>Manhã</option><option>Tarde</option><option>Noite</option></select>
-        
-        <button onclick="salvarReserva()">CONFIRMAR AGENDAMENTO</button>
-        <button style="background:#777" onclick="mostrar('tela-login')">VOLTAR</button>
+        <button onclick="salvarReserva()">RESERVAR</button>
+        <button style="background:#666" onclick="mostrar('tela-login')">VOLTAR</button>
     </div>
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec"; // COLOQUE SEU LINK AQUI
-    const params = new URLSearchParams(window.location.search);
-    const salaURL = params.get('sala') || "B5";
-    document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
-    let matGlobal = "";
+    const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
+    const salaURL = new URLSearchParams(window.location.search).get('sala') || "B5";
+    document.getElementById('txt-sala').innerText = "Lab: " + salaURL;
+    let matAtiva = "";
 
     function mostrar(id) {
-        document.getElementById('tela-login').classList.add('hidden');
-        document.getElementById('tela-devolucao').classList.add('hidden');
-        document.getElementById('tela-reserva').classList.add('hidden');
+        document.querySelectorAll('.card > div').forEach(d => d.classList.add('hidden'));
         document.getElementById(id).classList.remove('hidden');
     }
 
     function buscarNome() {
         const mat = document.getElementById('res-mat').value;
-        if(!mat) return;
-        fetch(`${API_URL}?acao=getUsuario&matricula=${mat}`)
-        .then(r => r.json()).then(res => {
-            document.getElementById('res-nome').value = res.nome || "Não encontrado!";
+        if(mat.length < 3) return;
+        fetch(`${API_URL}?acao=getUsuario&matricula=${mat}`).then(r => r.json()).then(res => {
+            document.getElementById('res-nome').value = res.nome;
         });
     }
 
@@ -83,25 +70,17 @@
         mostrar('tela-reserva');
         fetch(`${API_URL}?acao=getSalas`).then(r => r.json()).then(res => {
             const sel = document.getElementById('res-sala-sel');
-            sel.innerHTML = '<option value="">Escolha a Sala</option>';
-            res.forEach((s, i) => { if(i>0) sel.innerHTML += `<option value="${s[0]}">${s[1]}</option>`; });
+            sel.innerHTML = '<option value="">Selecione a Sala</option>';
+            res.slice(1).forEach(s => sel.innerHTML += `<option value="${s[0]}">${s[1]}</option>`);
         });
     }
 
     function verAgenda() {
-        const sala = document.getElementById('res-sala-sel').value;
+        const s = document.getElementById('res-sala-sel').value;
         const box = document.getElementById('box-agenda');
-        if(!sala) return;
-        box.innerHTML = "Carregando agenda...";
-        fetch(`${API_URL}?acao=getAgenda&sala=${sala}`).then(r => r.json()).then(res => {
-            if(res.length <= 1) {
-                box.innerHTML = "<p style='color:green'>Agenda livre!</p>";
-            } else {
-                box.innerHTML = "<strong>Ocupado em:</strong><br>";
-                res.forEach((r, i) => {
-                    if(i>0) box.innerHTML += `<div class="agenda-item">📅 ${r[0]} - 🕒 ${r[4]} (${r[3]})</div>`;
-                });
-            }
+        if(!s) return; box.innerHTML = "Carregando...";
+        fetch(`${API_URL}?acao=getAgenda&sala=${s}`).then(r => r.json()).then(res => {
+            box.innerHTML = res.length <= 1 ? "Livre!" : res.slice(1).map(r => `<div style="font-size:11px border-bottom:1px solid #eee">📅 ${r[0]} - ${r[4]} (${r[3]})</div>`).join('');
         });
     }
 
@@ -110,35 +89,25 @@
         const mat = document.getElementById('res-mat').value;
         const nome = document.getElementById('res-nome').value;
         const sala = document.getElementById('res-sala-sel').value;
-        const turno = document.getElementById('res-turno').value;
-
-        if(!datas || !mat || !sala || nome.includes("Não encontrado")) {
-            return Swal.fire('Atenção', 'Preencha todos os campos corretamente.', 'warning');
-        }
-
+        if(!datas || !mat || !sala) return alert("Preencha tudo");
         Swal.fire({title: 'Salvando...', didOpen: () => Swal.showLoading()});
-        fetch(`${API_URL}?acao=reservar&datas=${datas}&matricula=${mat}&nome=${nome}&sala=${sala}&turno=${turno}`)
-        .then(r => r.json()).then(() => { 
-            Swal.fire('Sucesso!', 'Reserva efetuada.', 'success').then(() => mostrar('tela-login')); 
-        });
+        fetch(`${API_URL}?acao=reservar&datas=${datas}&matricula=${mat}&nome=${nome}&sala=${sala}&turno=${document.getElementById('res-turno').value}`)
+        .then(() => { Swal.fire('Sucesso!', 'Reserva ok', 'success').then(() => mostrar('tela-login')); });
     }
 
     function entrar() {
-        matGlobal = document.getElementById('mat-login').value;
-        if(!matGlobal) return alert("Insira sua matrícula");
-        Swal.fire({title: 'Validando...', didOpen: () => Swal.showLoading()});
-        fetch(`${API_URL}?acao=verificar&matricula=${matGlobal}&sala=${salaURL}`)
-        .then(r => r.json()).then(res => {
-            if(res.status === "sucesso" || res.status === "ja_logado") {
-                mostrar('tela-devolucao'); Swal.close();
-            } else { Swal.fire('Negado', res.msg, 'error'); }
+        matAtiva = document.getElementById('mat-login').value;
+        if(!matAtiva) return;
+        Swal.fire({title: 'Entrando...', didOpen: () => Swal.showLoading()});
+        fetch(`${API_URL}?acao=verificar&matricula=${matAtiva}&sala=${salaURL}`).then(r => r.json()).then(res => {
+            if(res.status === "sucesso" || res.status === "ja_logado") { mostrar('tela-devolucao'); Swal.close(); }
+            else { Swal.fire('Erro', res.msg, 'error'); }
         });
     }
 
     function sair() {
-        const obs = document.getElementById('relato').value;
-        fetch(`${API_URL}?acao=devolver&matricula=${matGlobal}&sala=${salaURL}&relato=${obs}`)
-        .then(() => { Swal.fire('Saída OK', 'Chave devolvida.', 'success').then(() => location.reload()); });
+        fetch(`${API_URL}?acao=devolver&matricula=${matAtiva}&sala=${salaURL}&relato=${document.getElementById('relato').value}`)
+        .then(() => { Swal.fire('Saída OK', 'Até logo!', 'success').then(() => location.reload()); });
     }
 </script>
 </body>
