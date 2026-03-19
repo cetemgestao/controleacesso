@@ -31,7 +31,7 @@
 
 <div class="card">
     
-    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" style="width:120px; margin-bottom: 10px;">
+    <img src="SUA-IMAGEM-AQUI" style="width:120px; margin-bottom: 10px;">
     
     <h3 id="txt-sala" style="color:var(--vermelho); margin: 10px 0;"></h3>
 
@@ -136,7 +136,6 @@
         } catch(e) { Swal.fire('Erro', 'Falha na conexão.', 'error'); }
     }
 
-    // LÊ AO VIVO, IMPOSSÍVEL SUMIR NO F5
     function carregarAgenda() {
         const sala = document.getElementById('res-sala-sel').value;
         if(!sala) return;
@@ -206,8 +205,7 @@
             if(res.status === "sucesso") {
                 Swal.fire('Sucesso!', 'Horários reservados.', 'success').then(() => {
                     selecionados = [];
-                    // Puxa ao vivo direto da planilha, não vai sumir no F5!
-                    carregarAgenda(); 
+                    carregarAgenda(); // Instantâneo agora por causa do cache invalidado
                 });
             } else Swal.fire('Ocupado', res.msg, 'error').then(() => carregarAgenda());
         });
@@ -254,7 +252,6 @@
         fetch(`${API_URL}?acao=verificar&matricula=${m}&sala=${salaURL}`).then(r => r.json()).then(res => {
             if(res.status === "sucesso" || res.status === "ja_logado") { mostrar('tela-devolucao'); Swal.close(); }
             else { 
-                // Se barrar, ele avisa se foi porque tentou entrar de tarde tendo reservado pra noite!
                 Swal.fire('Acesso Negado', res.msg, 'error'); 
             }
         });
