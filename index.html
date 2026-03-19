@@ -41,6 +41,8 @@
         <input type="password" id="senha-login" placeholder="Sua Senha (PIN)">
         <button id="btn-entrar" onclick="entrar()">ENTRAR NO LAB</button>
         <button style="background:#6c757d; margin-top:15px;" onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
+        
+        <button style="background:#ff9800; margin-top:10px;" onclick="trocarSenha()">🔑 ALTERAR MINHA SENHA</button>
     </div>
 
     <div id="tela-devolucao" class="hidden">
@@ -102,7 +104,6 @@
     const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'], turnos = ['Manhã', 'Tarde', 'Noite'];
     const nomeMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-    // CARREGA INSTRUTORES E SENHAS NO FUNDO ASSIM QUE O SITE ABRE
     window.onload = async () => {
         try {
             const resI = await fetch(`${URL_INSTRUTORES}&t=${Date.now()}`).then(r => r.text());
@@ -110,7 +111,6 @@
             listaInstrutores = jI.table.rows.map(r => ({ 
                 mat: r.c[0]?.v?.toString() || "", 
                 nome: r.c[1]?.v || "",
-                // Lê a Coluna C (senha). Se estiver vazia, a senha provisória é a própria matrícula
                 senha: r.c[2]?.v?.toString() || r.c[0]?.v?.toString() 
             }));
         } catch(e) { console.log("Aguardando carregamento de banco..."); }
@@ -121,7 +121,6 @@
         document.getElementById(id).classList.remove('hidden');
     }
 
-    // SISTEMA DE VALIDAÇÃO DE SENHA
     function validarSenha(matInput, senhaInput) {
         if (listaInstrutores.length === 0) return "Banco de dados carregando, aguarde 2 segundos e tente de novo.";
         const instrutor = listaInstrutores.find(i => i.mat === matInput);
@@ -257,6 +256,52 @@
         });
     }
 
+    // === NOVA FUNÇÃO: TROCAR SENHA COM VALIDAÇÃO DE 6 NÚMEROS ===
+    function trocarSenha() {
+        Swal.fire({
+            title: 'Alterar Senha de Acesso',
+            html: `
+                <input type="text" id="swal-mat" class="swal2-input" placeholder="Sua Matrícula">
+                <input type="password" id="swal-senha-atual" class="swal2-input" placeholder="Senha Atual (Padrão é a matrícula)">
+                <input type="password" id="swal-nova-senha" class="swal2-input" placeholder="Nova Senha (Exatamente 6 números)" maxlength="6">
+            `,
+            confirmButtonText: 'Trocar Senha',
+            confirmButtonColor: '#ff9800',
+            showCancelButton: true,
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => {
+                const mat = document.getElementById('swal-mat').value;
+                const atual = document.getElementById('swal-senha-atual').value;
+                const nova = document.getElementById('swal-nova-senha').value;
+                if (!mat || !atual || !nova) {
+                    Swal.showValidationMessage('Preencha todos os campos!');
+                    return false;
+                }
+                if (!/^\d{6}$/.test(nova)) {
+                    Swal.showValidationMessage('A nova senha deve ter EXATAMENTE 6 NÚMEROS!');
+                    return false;
+                }
+                return { mat, atual, nova };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({title: 'Trocando senha...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                fetch(`${API_URL}?acao=alterar_senha&matricula=${result.value.mat}&senha_atual=${result.value.atual}&nova_senha=${result.value.nova}`)
+                .then(r => r.json())
+                .then(res => {
+                    if(res.status === "sucesso") {
+                        // Atualiza a memória para não precisar dar F5
+                        let prof = listaInstrutores.find(i => i.mat === result.value.mat);
+                        if (prof) prof.senha = result.value.nova;
+                        Swal.fire('Pronto!', 'Sua senha foi atualizada. Não esqueça dela!', 'success');
+                    } else {
+                        Swal.fire('Erro', res.msg, 'error');
+                    }
+                });
+            }
+        });
+    }
+
     function gerarRelatorio() {
         Swal.fire({title: 'Calculando...', didOpen: () => Swal.showLoading()});
         const URL_RES_GVIZ = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
@@ -290,24 +335,21 @@
         });
     }
 
-    // NOVA TELA DE CHECK-OUT COM O ALARME
     function iniciarDevolucao() {
         Swal.fire({
             title: '⚠️ CHECK-OUT DO LAB',
             text: "Você confirma que todos os equipamentos estão conforme o recebimento (limpos e operantes)?",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#28a745', // Verde para o Sim
-            cancelButtonColor: '#ed1c24', // Vermelho para o Não
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#ed1c24',
             confirmButtonText: 'SIM, confirmo',
             cancelButtonText: 'NÃO, relatar problema',
-            reverseButtons: true // Coloca o SIM na direita
+            reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
-                // Se clicou em SIM
                 processarSaida("Tudo OK e conforme.");
             } else if (result.dismiss === Swal.DismissReason.cancel) {
-                // Se clicou em NÃO
                 Swal.fire({
                     title: 'Relatar Problema',
                     text: 'Por favor, descreva qual equipamento apresentou problema:',
@@ -318,11 +360,8 @@
                     cancelButtonText: 'Cancelar'
                 }).then((textResult) => {
                     if (textResult.isConfirmed) {
-                        if (!textResult.value) {
-                            Swal.fire('Atenção', 'O relato não pode estar vazio.', 'warning');
-                        } else {
-                            processarSaida("AVARIA: " + textResult.value);
-                        }
+                        if (!textResult.value) Swal.fire('Atenção', 'O relato não pode estar vazio.', 'warning');
+                        else processarSaida("AVARIA: " + textResult.value);
                     }
                 });
             }
