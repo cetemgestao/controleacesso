@@ -1,151 +1,146 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENAI - Lab Control</title>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <style>
-        :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--fundo); padding: 10px; margin: 0; display: flex; justify-content: center; }
-        .card { background: white; padding: 20px; border-radius: 12px; max-width: 600px; width: 100%; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
-        input, select, button, textarea { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; box-sizing: border-box; }
-        button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:hover { opacity: 0.9; }
-        .hidden { display: none; }
-        .calendario-container { margin-top: 15px; overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
-        .tabela-grade { width: 100%; border-collapse: collapse; min-width: 500px; }
-        .tabela-grade th, .tabela-grade td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 12px; }
-        .tabela-grade th { background: #f0f0f0; }
-        .turno-label { font-weight: bold; background: #fafafa; color: var(--azul); width: 60px; }
-        .celula-livre { background: white; cursor: pointer; transition: 0.2s; }
-        .celula-livre:hover { background: #f0f7ff; }
-        .celula-selecionada { background: #b3d4ff !important; color: var(--azul); font-weight: bold; border: 2px solid var(--azul) !important; cursor: pointer; }
-        .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; font-size: 10px; line-height: 1.2; cursor: not-allowed; }
-        .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); }
-        .nav-semana button { width: auto; padding: 5px 15px; margin: 0; }
-        .aviso-qr { color: #666; font-size: 13px; margin: 10px 0; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENAI - Lab Control</title>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<style>
+:root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f4f7f6; }
+body { font-family: 'Segoe UI', sans-serif; background: var(--fundo); padding: 10px; margin: 0; display: flex; justify-content: center; }
+.card { background: white; padding: 20px; border-radius: 12px; max-width: 600px; width: 100%; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
+input, select, button, textarea { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; box-sizing: border-box; }
+button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; }
+.hidden { display: none; }
+.calendario-container { margin-top: 15px; overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
+.tabela-grade { width: 100%; border-collapse: collapse; min-width: 500px; }
+.tabela-grade th, .tabela-grade td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 12px; }
+.turno-label { font-weight: bold; background: #fafafa; color: var(--azul); }
+.celula-livre { cursor: pointer; }
+.celula-selecionada { background: #b3d4ff; font-weight: bold; }
+.celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; }
+</style>
 </head>
+
 <body>
 
 <div class="card">
-    
-    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" style="width:120px; margin-bottom: 10px;">
-    
-    <h3 id="txt-sala" style="color:var(--vermelho); margin: 10px 0;"></h3>
 
-    <div id="tela-login">
-        <div id="aviso-qr" class="aviso-qr hidden">📍 Central de Reservas<br>Leia o QR Code da porta para registrar entrada.</div>
+<h3 id="txt-sala"></h3>
 
-        <!-- ✅ MATRÍCULA (NÃO SOME MAIS) -->
-        <input type="text" id="mat-login" placeholder="Sua Matrícula">
+<div id="tela-login">
+<div id="aviso-qr" class="aviso-qr hidden">📍 Central de Reservas</div>
 
-        <!-- ✅ NOVO: SENHA -->
-        <input type="password" id="mat-pin" placeholder="Senha">
+<input type="text" id="mat-login" placeholder="Sua Matrícula">
+<input type="password" id="mat-pin" placeholder="Senha">
 
-        <button id="btn-entrar" onclick="entrar()">ENTRAR NO LAB</button>
-        <button style="background:#6c757d; margin-top:15px;" onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
-    </div>
+<button onclick="entrar()">ENTRAR</button>
+<button onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
+</div>
 
-    <div id="tela-devolucao" class="hidden">
-        <h2 style="color:var(--azul)">Sessão Ativa</h2>
-        <textarea id="relato" placeholder="Relato de uso (opcional)" rows="3"></textarea>
-        <button style="background:var(--vermelho)" onclick="sair()">DEVOLVER CHAVE E SAIR</button>
-    </div>
+<div id="tela-devolucao" class="hidden">
+<textarea id="relato"></textarea>
+<button onclick="sair()">SAIR</button>
+</div>
 
-    <div id="tela-reserva" class="hidden">
-        <div style="display: flex; gap: 8px;">
-            <input type="text" id="res-mat" placeholder="Matrícula" oninput="buscarNome()" style="flex: 1;">
-            <input type="text" id="res-nome" placeholder="Nome" style="background:#eee; flex: 2;" readonly>
-        </div>
+<div id="tela-reserva" class="hidden">
+<input type="text" id="res-mat" placeholder="Matrícula">
+<input type="password" id="res-pin" placeholder="Senha">
+<input type="text" id="res-nome" readonly>
 
-        <!-- ✅ NOVO: SENHA -->
-        <input type="password" id="res-pin" placeholder="Senha">
+<select id="res-sala-sel" onchange="carregarAgenda()"></select>
 
-        <select id="res-sala-sel" onchange="carregarAgenda()"><option value="">Carregando salas...</option></select>
-        
-        <div id="area-calendario" class="hidden">
-            <div class="nav-semana">
-                <button onclick="mudarSemana(-1)">&#9664;</button>
-                <span id="texto-semana">Mês</span>
-                <button onclick="mudarSemana(1)">&#9654;</button>
-            </div>
-            <div class="calendario-container">
-                <table class="tabela-grade">
-                    <thead id="grade-cabecalho"></thead>
-                    <tbody id="grade-corpo"></tbody>
-                </table>
-            </div>
-        </div>
-        
-        <button onclick="enviarReservas()" style="margin-top:15px;">CONFIRMAR AGENDAMENTOS</button>
-        <button onclick="gerarRelatorio()" style="background:#673ab7;">📊 RELATÓRIO DE OCUPAÇÃO</button>
-        <button style="background:#777" onclick="location.reload()">VOLTAR</button>
-    </div>
+<table class="tabela-grade">
+<thead id="grade-cabecalho"></thead>
+<tbody id="grade-corpo"></tbody>
+</table>
+
+<button onclick="enviarReservas()">CONFIRMAR</button>
+<button onclick="location.reload()">VOLTAR</button>
+</div>
+
 </div>
 
 <script>
 
-const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U";
 const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
-
-const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
-const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
 
 const params = new URLSearchParams(window.location.search);
 const salaURL = params.get('sala');
 
-// ✅ CORREÇÃO: NÃO ESCONDE MAIS MATRÍCULA
-if (salaURL) {
-    document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
-} else {
-    document.getElementById('txt-sala').innerText = "Central de Reservas";
-    document.getElementById('aviso-qr').classList.remove('hidden');
+// NÃO ESCONDE MAIS NADA
+document.getElementById('txt-sala').innerText = salaURL ? "Laboratório: "+salaURL : "Central de Reservas";
+
+// ================= UI =================
+function mostrar(id){
+document.querySelectorAll('.card > div').forEach(d=>d.classList.add('hidden'));
+document.getElementById(id).classList.remove('hidden');
 }
 
 // ================= LOGIN =================
-function entrar() {
-    const m = document.getElementById('mat-login').value;
-    const pin = document.getElementById('mat-pin').value;
+function entrar(){
+const m = document.getElementById('mat-login').value;
+const pin = document.getElementById('mat-pin').value;
 
-    if(!m || !pin) return Swal.fire('Atenção', 'Digite matrícula e senha.', 'warning');
+if(!m || !pin) return Swal.fire('Digite matrícula e senha');
 
-    fetch(`${API_URL}?acao=verificar&matricula=${m}&pin=${pin}&sala=${salaURL}`)
-    .then(r => r.json())
-    .then(res => {
-        if(res.status === "sucesso" || res.status === "ja_logado") {
-            mostrar('tela-devolucao');
-        } else {
-            Swal.fire('Erro', res.msg, 'error');
-        }
-    });
+fetch(`${API_URL}?acao=verificar&matricula=${m}&pin=${pin}&sala=${salaURL}`)
+.then(r=>r.json())
+.then(res=>{
+if(res.status==="sucesso" || res.status==="ja_logado"){
+mostrar('tela-devolucao');
+}else{
+Swal.fire(res.msg);
+}
+});
 }
 
-// ================= SAÍDA =================
-function sair() {
-    const m = document.getElementById('mat-login').value;
-
-    if (salaURL === "B5") {
-        Swal.fire({
-            title: 'Confirmação obrigatória',
-            text: 'Você confirma que todos os equipamentos estão na sala?',
-            showCancelButton: true
-        }).then(result => {
-            if(result.isConfirmed) registrarSaida(m);
-        });
-    } else {
-        registrarSaida(m);
-    }
+// ================= RESERVA =================
+function abrirReserva(){
+mostrar('tela-reserva');
 }
 
-function registrarSaida(m) {
-    fetch(`${API_URL}?acao=devolver&matricula=${m}&sala=${salaURL}&relato=${document.getElementById('relato').value}`)
-    .then(() => location.reload());
+// ================= AGENDA =================
+function carregarAgenda(){
+const sala = document.getElementById('res-sala-sel').value;
+
+fetch(`${API_URL}?acao=getAgenda&sala=${sala}`)
+.then(r=>r.json())
+.then(res=>{
+document.getElementById('grade-corpo').innerHTML = JSON.stringify(res);
+});
 }
 
-// ================= RESTO DO SISTEMA ORIGINAL =================
-// (não mexido)
+// ================= RESERVAR =================
+function enviarReservas(){
+const mat = document.getElementById('res-mat').value;
+const pin = document.getElementById('res-pin').value;
+const sala = document.getElementById('res-sala-sel').value;
+
+fetch(`${API_URL}?acao=reservar&matricula=${mat}&pin=${pin}&sala=${sala}&reservas=[]`)
+.then(r=>r.json())
+.then(res=>Swal.fire(res.status));
+}
+
+// ================= SAIR =================
+function sair(){
+const m = document.getElementById('mat-login').value;
+
+if(salaURL==="B5"){
+Swal.fire({title:"Confirmou equipamentos?",showCancelButton:true})
+.then(r=>{
+if(r.isConfirmed) registrarSaida(m);
+});
+}else{
+registrarSaida(m);
+}
+}
+
+function registrarSaida(m){
+fetch(`${API_URL}?acao=devolver&matricula=${m}&sala=${salaURL}`)
+.then(()=>location.reload());
+}
 
 </script>
 
