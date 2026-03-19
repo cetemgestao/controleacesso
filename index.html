@@ -28,34 +28,42 @@ button { background: var(--azul); color: white; border: none; font-weight: bold;
 
 <div class="card">
 
-<h3 id="txt-sala"></h3>
+<h3 id="txt-sala">Central de Reservas</h3>
 
+<!-- LOGIN -->
 <div id="tela-login">
-<input type="text" id="mat-login" placeholder="Matrícula">
+<input type="text" id="mat-login" placeholder="Sua Matrícula">
 <input type="password" id="mat-pin" placeholder="Senha">
-<button onclick="entrar()">ENTRAR</button>
-<button onclick="abrirReserva()">VER AGENDA</button>
+<button onclick="entrar()">ENTRAR NO LAB</button>
+<button onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
 </div>
 
+<!-- DEVOLUÇÃO -->
 <div id="tela-devolucao" class="hidden">
-<textarea id="relato" placeholder="Relato"></textarea>
-<button onclick="sair()">DEVOLVER</button>
+<h2>Uso em andamento</h2>
+<textarea id="relato" placeholder="Relato (opcional)"></textarea>
+<button style="background:var(--vermelho)" onclick="sair()">DEVOLVER CHAVE</button>
 </div>
 
+<!-- RESERVA -->
 <div id="tela-reserva" class="hidden">
+
 <input type="text" id="res-mat" placeholder="Matrícula">
 <input type="password" id="res-pin" placeholder="Senha">
-<input type="text" id="res-nome" readonly>
+<input type="text" id="res-nome" placeholder="Nome" readonly>
 
 <select id="res-sala-sel" onchange="carregarAgenda()"></select>
 
+<div class="calendario-container">
 <table class="tabela-grade">
 <thead id="grade-cabecalho"></thead>
 <tbody id="grade-corpo"></tbody>
 </table>
+</div>
 
-<button onclick="enviarReservas()">CONFIRMAR</button>
+<button onclick="enviarReservas()">CONFIRMAR AGENDAMENTOS</button>
 <button onclick="location.reload()">VOLTAR</button>
+
 </div>
 
 </div>
@@ -67,14 +75,15 @@ const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJ
 let agendaAtual = [];
 let mapaAgenda = {};
 let selecionados = [];
+let dataInicioSemana = new Date();
 let carregandoAgenda = false;
 
 // =========================
-// INDEXAÇÃO (performance)
+// INDEXAÇÃO
 // =========================
-function indexarAgenda() {
+function indexarAgenda(){
     mapaAgenda = {};
-    agendaAtual.forEach(r => {
+    agendaAtual.forEach(r=>{
         mapaAgenda[`${r.data}|${r.turno}`] = r;
     });
 }
@@ -82,19 +91,19 @@ function indexarAgenda() {
 // =========================
 // LOGIN
 // =========================
-function entrar() {
+function entrar(){
     const mat = document.getElementById('mat-login').value;
     const pin = document.getElementById('mat-pin').value;
 
-    if(!mat || !pin) return Swal.fire('Preencha tudo');
+    if(!mat || !pin) return Swal.fire('Erro','Preencha matrícula e senha');
 
     fetch(`${API_URL}?acao=verificar&matricula=${mat}&pin=${pin}&sala=B5`)
-    .then(r => r.json())
-    .then(res => {
+    .then(r=>r.json())
+    .then(res=>{
         if(res.status === "sucesso"){
             mostrar('tela-devolucao');
         } else {
-            Swal.fire('Erro', res.msg);
+            Swal.fire('Erro',res.msg);
         }
     });
 }
@@ -106,20 +115,20 @@ function abrirReserva(){
     mostrar('tela-reserva');
 }
 
-function carregarAgenda() {
+function carregarAgenda(){
     if(carregandoAgenda) return;
     carregandoAgenda = true;
 
-    const sala = document.getElementById('res-sala-sel').value;
+    const sala = document.getElementById('res-sala-sel').value || "B5";
 
     fetch(`${API_URL}?acao=getAgenda&sala=${sala}`)
-    .then(r => r.json())
-    .then(res => {
+    .then(r=>r.json())
+    .then(res=>{
         agendaAtual = res;
         indexarAgenda();
         renderizar();
     })
-    .finally(()=> carregandoAgenda=false);
+    .finally(()=>carregandoAgenda=false);
 }
 
 function renderizar(){
@@ -127,10 +136,10 @@ function renderizar(){
     const turnos = ["Manhã","Tarde","Noite"];
 
     turnos.forEach(t=>{
-        html += "<tr><td>"+t+"</td>";
+        html += `<tr><td class="turno-label">${t}</td>`;
 
         for(let i=1;i<=7;i++){
-            const data = "01/01/2026"; // simplificado
+            const data = "01/01/2026";
             const r = mapaAgenda[`${data}|${t.toUpperCase()}`];
 
             if(r){
@@ -158,17 +167,21 @@ function selecionar(id){
 function enviarReservas(){
     const mat = document.getElementById('res-mat').value;
     const pin = document.getElementById('res-pin').value;
+    const sala = document.getElementById('res-sala-sel').value || "B5";
+
+    if(!pin) return Swal.fire('Erro','Digite a senha');
 
     const dados = selecionados.map(s=>{
         const [data,turno] = s.split("|");
         return {data,turno};
     });
 
-    fetch(`${API_URL}?acao=reservar&matricula=${mat}&pin=${pin}&sala=B5&reservas=${encodeURIComponent(JSON.stringify(dados))}`)
+    fetch(`${API_URL}?acao=reservar&matricula=${mat}&pin=${pin}&sala=${sala}&reservas=${encodeURIComponent(JSON.stringify(dados))}`)
     .then(r=>r.json())
     .then(res=>{
         if(res.status==="sucesso"){
-            Swal.fire('OK');
+            Swal.fire('Sucesso');
+            selecionados = [];
             carregarAgenda();
         } else {
             Swal.fire('Erro',res.msg);
@@ -177,12 +190,12 @@ function enviarReservas(){
 }
 
 // =========================
-// SAÍDA COM BLOQUEIO B5
+// SAÍDA (B5 OBRIGATÓRIO)
 // =========================
 function sair(){
     Swal.fire({
-        title:"Confirmação obrigatória",
-        text:"Você conferiu todos os computadores da sala?",
+        title:'Confirmação obrigatória',
+        text:'Você conferiu todos os equipamentos da sala?',
         showCancelButton:true
     }).then(r=>{
         if(r.isConfirmed){
