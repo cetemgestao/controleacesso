@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENAI - Lab Control</title>
+    <title>SENAI - Lab Control Turbo</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f4f7f6; }
@@ -77,16 +77,18 @@
     const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U";
     const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
     
-    // GViz apenas para baixar Salas e Instrutores rápido
     const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
     const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
     
     const params = new URLSearchParams(window.location.search);
     const salaURL = params.get('sala');
-    if (salaURL) document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
-    else {
+
+    if (salaURL) {
+        document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
+    } else {
         document.getElementById('txt-sala').innerText = "Central de Reservas";
-        document.querySelectorAll('#mat-login, #btn-entrar').forEach(el => el.classList.add('hidden'));
+        document.getElementById('mat-login').classList.add('hidden');
+        document.getElementById('btn-entrar').classList.add('hidden');
         document.getElementById('aviso-qr').classList.remove('hidden');
     }
     
@@ -118,15 +120,23 @@
             ]);
             const jI = JSON.parse(resI.substring(47).slice(0, -2));
             listaInstrutores = jI.table.rows.map(r => ({ mat: r.c[0]?.v?.toString() || "", nome: r.c[1]?.v || "" }));
+            
             const jS = JSON.parse(resS.substring(47).slice(0, -2));
             const sel = document.getElementById('res-sala-sel');
             sel.innerHTML = '<option value="">Selecione a Sala</option>';
-            jS.table.rows.forEach(r => { if(r.c && r.c[0]?.v && r.c[0].v !== "Sala") sel.innerHTML += `<option value="${r.c[0].v}">${r.c[1]?.v}</option>`; });
+            jS.table.rows.forEach(r => { 
+                if(r.c && r.c[0]?.v && String(r.c[0].v).toLowerCase() !== "sala") {
+                    // CORREÇÃO APLICADA AQUI: Gravar o Nome (r.c[1]) em vez do ID (r.c[0])
+                    const nomeDaSala = r.c[1]?.v;
+                    if(nomeDaSala) {
+                        sel.innerHTML += `<option value="${nomeDaSala}">${nomeDaSala}</option>`; 
+                    }
+                }
+            });
             if(salaURL) { sel.value = salaURL; carregarAgenda(); } else { Swal.close(); }
-        } catch(e) { Swal.fire('Erro', 'Falha na conexão.', 'error'); }
+        } catch(e) { Swal.fire('Erro', 'Falha ao baixar dados.', 'error'); }
     }
 
-    // A MÁGICA AO VIVO ACONTECE AQUI (Sem cache, sem ignorar linha esquerda/direita)
     function carregarAgenda() {
         const sala = document.getElementById('res-sala-sel').value;
         if(!sala) return;
@@ -196,7 +206,7 @@
             if(res.status === "sucesso") {
                 Swal.fire('Sucesso!', 'Horários reservados.', 'success').then(() => {
                     selecionados = [];
-                    carregarAgenda(); // Puxa limpo direto da planilha
+                    setTimeout(() => { carregarAgenda(); }, 1200);
                 });
             } else Swal.fire('Ocupado', res.msg, 'error').then(() => carregarAgenda());
         });
@@ -210,7 +220,9 @@
                 fetch(`${API_URL}?acao=cancelar&sala=${sala}&matricula=${mat}&data=${data}&turno=${turno}`)
                 .then(r => r.json()).then(res => {
                     if(res.status === "sucesso") {
-                        Swal.fire('Removido!', '', 'success').then(() => carregarAgenda());
+                        Swal.fire('Removido!', '', 'success').then(() => {
+                            setTimeout(() => { carregarAgenda(); }, 1200);
+                        });
                     } else Swal.fire('Erro', res.msg, 'error');
                 });
             }
@@ -238,18 +250,21 @@
 
     function entrar() {
         const m = document.getElementById('mat-login').value;
-        if(!m) return Swal.fire('Matrícula!', '', 'warning');
-        Swal.fire({title: 'Acessando porta...', didOpen: () => Swal.showLoading()});
+        if(!m) return Swal.fire('Atenção', 'Digite sua matrícula.', 'warning');
+        Swal.fire({title: 'Validando...', didOpen: () => Swal.showLoading()});
         fetch(`${API_URL}?acao=verificar&matricula=${m}&sala=${salaURL}`).then(r => r.json()).then(res => {
-            if(res.status === "sucesso" || res.status === "ja_logado") mostrar('tela-devolucao'), Swal.close();
-            else Swal.fire('Negado', res.msg, 'error');
+            if(res.status === "sucesso" || res.status === "ja_logado") { mostrar('tela-devolucao'); Swal.close(); }
+            else { 
+                // Se der erro, ele vai te mostrar exatamente o que procurou
+                Swal.fire('Acesso Negado', res.msg, 'error'); 
+            }
         });
     }
 
     function sair() {
         const m = document.getElementById('mat-login').value;
         fetch(`${API_URL}?acao=devolver&matricula=${m}&sala=${salaURL}&relato=${document.getElementById('relato').value}`)
-        .then(() => Swal.fire('Até logo!').then(() => location.reload()));
+        .then(() => Swal.fire('Saída Registrada', 'Chave devolvida!', 'success').then(() => location.reload()));
     }
 </script>
 </body>
