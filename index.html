@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENAI - Lab Control Turbo</title>
+    <title>SENAI - Lab Control</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root { --azul: #005696; --vermelho: #ed1c24; --fundo: #f4f7f6; }
@@ -11,20 +11,8 @@
         .card { background: white; padding: 20px; border-radius: 12px; max-width: 600px; width: 100%; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
         input, select, button, textarea { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; box-sizing: border-box; }
         button { background: var(--azul); color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:hover { opacity: 0.9; }
         .hidden { display: none; }
-        .calendario-container { margin-top: 15px; overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; }
-        .tabela-grade { width: 100%; border-collapse: collapse; min-width: 500px; }
-        .tabela-grade th, .tabela-grade td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 12px; }
-        .tabela-grade th { background: #f0f0f0; }
-        .turno-label { font-weight: bold; background: #fafafa; color: var(--azul); width: 60px; }
-        .celula-livre { background: white; cursor: pointer; transition: 0.2s; }
-        .celula-livre:hover { background: #f0f7ff; }
-        .celula-selecionada { background: #b3d4ff !important; color: var(--azul); font-weight: bold; border: 2px solid var(--azul) !important; cursor: pointer; }
-        .celula-ocupada { background: #ffebeb; color: var(--vermelho); font-weight: bold; font-size: 10px; line-height: 1.2; cursor: not-allowed; }
         .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); }
-        .nav-semana button { width: auto; padding: 5px 15px; margin: 0; }
-        .aviso-qr { color: #666; font-size: 13px; margin: 10px 0; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; }
     </style>
 </head>
 <body>
@@ -35,63 +23,22 @@
 
     <div id="tela-login">
         <input type="text" id="mat-login" placeholder="Sua Matrícula">
-        <input type="password" id="senha-login" placeholder="Sua Senha (PIN)">
-        <button id="btn-entrar" onclick="entrar()">ENTRAR NO LAB</button>
-        <button style="background:#6c757d; margin-top:15px;" onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
-        <button style="background:#ff9800; margin-top:10px;" onclick="trocarSenha()">🔑 ALTERAR SENHA</button>
+        <input type="password" id="senha-login" placeholder="Sua Senha">
+        <button onclick="entrar()">ENTRAR NO LAB</button>
+        <button style="background:#6c757d; margin-top:10px;" onclick="mostrar('tela-reserva')">RESERVAR</button>
     </div>
 
     <div id="tela-devolucao" class="hidden">
         <h2 style="color:var(--azul)">Sessão Ativa</h2>
-        <button style="background:var(--vermelho); padding: 20px;" onclick="iniciarDevolucao()">🔒 DEVOLVER CHAVE E SAIR</button>
-    </div>
-
-    <div id="tela-reserva" class="hidden">
-        <div style="display: flex; gap: 8px;">
-            <input type="text" id="res-mat" placeholder="Matrícula" oninput="buscarNome()" style="flex: 1.5;">
-            <input type="password" id="res-senha" placeholder="Senha" style="flex: 1;">
-        </div>
-        <input type="text" id="res-nome" placeholder="Nome do Instrutor" style="background:#eee;" readonly>
-        <select id="res-sala-sel" onchange="carregarAgenda()"><option value="">Carregando salas...</option></select>
-        <div id="area-calendario" class="hidden">
-            <div class="nav-semana">
-                <button onclick="mudarSemana(-1)">&#9664;</button>
-                <span id="texto-semana">Mês</span>
-                <button onclick="mudarSemana(1)">&#9654;</button>
-            </div>
-            <div class="calendario-container">
-                <table class="tabela-grade">
-                    <thead id="grade-cabecalho"></thead>
-                    <tbody id="grade-corpo"></tbody>
-                </table>
-            </div>
-        </div>
-        <button onclick="enviarReservas()" style="margin-top:15px;">CONFIRMAR AGENDAMENTOS</button>
-        <button style="background:#777" onclick="location.reload()">VOLTAR</button>
+        <button style="background:var(--vermelho); padding: 20px;" onclick="iniciarDevolucao()">🔒 DEVOLVER CHAVE</button>
     </div>
 </div>
 
 <script>
-    const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U";
-    const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
-    
-    const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
-    const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
-    
+    const API_URL = "SUA-URL-DO-SCRIPT-AQUI"; // Certifique-se de atualizar esta URL
     const params = new URLSearchParams(window.location.search);
     const salaURL = params.get('sala');
     if (salaURL) document.getElementById('txt-sala').innerText = "Laboratório: " + salaURL;
-
-    let selecionados = [], agendaAtual = [], listaInstrutores = [], dataInicioSemana = new Date(); 
-    const turnos = ['Manhã', 'Tarde', 'Noite'];
-
-    window.onload = async () => {
-        try {
-            const resI = await fetch(`${URL_INSTRUTORES}&t=${Date.now()}`).then(r => r.text());
-            const jI = JSON.parse(resI.substring(47).slice(0, -2));
-            listaInstrutores = jI.table.rows.map(r => ({ mat: r.c[0]?.v?.toString() || "", nome: r.c[1]?.v || "", senha: r.c[2]?.v?.toString() || r.c[0]?.v?.toString() }));
-        } catch(e) {}
-    };
 
     function mostrar(id) {
         document.querySelectorAll('.card > div').forEach(d => d.classList.add('hidden'));
@@ -99,79 +46,61 @@
     }
 
     function entrar() {
-        const mat = document.getElementById('mat-login').value, senha = document.getElementById('senha-login').value;
-        const inst = listaInstrutores.find(i => i.mat === mat);
-        if(!inst || inst.senha !== senha) return Swal.fire('Erro', 'Matrícula ou senha inválida.', 'error');
-        Swal.fire({title: 'Checando...', didOpen: () => Swal.showLoading()});
+        const mat = document.getElementById('mat-login').value;
+        Swal.fire({title: 'Validando...', didOpen: () => Swal.showLoading()});
         fetch(`${API_URL}?acao=verificar&matricula=${mat}&sala=${salaURL}`).then(r => r.json()).then(res => {
-            if(res.status === "sucesso" || res.status === "ja_logado") mostrar('tela-devolucao'), Swal.close();
-            else Swal.fire('Acesso Negado', res.msg, 'error');
+            if(res.status === "sucesso") mostrar('tela-devolucao'), Swal.close();
+            else Swal.fire('Erro', res.msg, 'error');
         });
     }
 
-    // === NOVA FUNÇÃO DE DEVOLUÇÃO COM CÂMERA ===
     function iniciarDevolucao() {
         Swal.fire({
-            title: 'Tudo OK?',
-            text: "Os equipamentos estão conforme o recebimento?",
-            icon: 'question',
+            title: 'Equipamentos OK?',
             showCancelButton: true,
-            confirmButtonText: 'SIM, tudo ok',
-            cancelButtonText: 'NÃO, relatar avaria',
-            reverseButtons: true
+            confirmButtonText: 'SIM',
+            cancelButtonText: 'NÃO'
         }).then((result) => {
-            if (result.isConfirmed) processarSaida("Tudo OK.", "");
+            if (result.isConfirmed) processarSaida("Tudo OK", "");
             else {
                 Swal.fire({
-                    title: 'Relato de Avaria',
-                    html: `
-                        <textarea id="texto-avaria" class="swal2-textarea" placeholder="O que aconteceu?"></textarea>
-                        <p style="font-size:13px; color:#666;">Opcional: Tire uma foto do problema</p>
-                        <input type="file" id="input-foto" accept="image/*" capture="camera" style="font-size:12px;">
-                    `,
-                    showCancelButton: true,
-                    confirmButtonText: 'Enviar Relato',
-                    preConfirm: () => {
-                        const relato = document.getElementById('texto-avaria').value;
-                        const fotoFile = document.getElementById('input-foto').files[0];
-                        if (!relato) return Swal.showValidationMessage('Descreva o problema!');
-                        return { relato, fotoFile };
-                    }
-                }).then((res) => {
+                    title: 'Relatar Avaria',
+                    html: '<textarea id="txt-avaria" class="swal2-textarea"></textarea><input type="file" id="f-foto" accept="image/*" capture="camera">',
+                    preConfirm: () => ({ relato: document.getElementById('txt-avaria').value, foto: document.getElementById('f-foto').files[0] })
+                }).then(res => {
                     if (res.isConfirmed) {
-                        if (res.value.fotoFile) {
+                        if (res.value.foto) {
                             const reader = new FileReader();
-                            reader.onload = (e) => processarSaida("AVARIA: " + res.value.relato, e.target.result);
-                            reader.readAsDataURL(res.value.fotoFile);
-                        } else processarSaida("AVARIA: " + res.value.relato, "");
+                            reader.onload = (e) => processarSaida(res.value.relato, e.target.result);
+                            reader.readAsDataURL(res.value.foto);
+                        } else processarSaida(res.value.relato, "");
                     }
                 });
             }
         });
     }
 
-    function processarSaida(relato, fotoBase64) {
-        const m = document.getElementById('mat-login').value;
-        Swal.fire({title: 'Enviando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+    async function processarSaida(relato, fotoBase64) {
+        const mat = document.getElementById('mat-login').value;
+        Swal.fire({title: 'Gravando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
-        const payload = new URLSearchParams({
-            acao: 'devolver',
-            matricula: m,
-            sala: salaURL,
-            relato: relato,
-            fotoBase64: fotoBase64
-        });
-
-        fetch(API_URL, { method: 'POST', body: payload, mode: 'no-cors' }) // No-cors para uploads grandes
-        .then(() => {
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                mode: 'no-cors', // Necessário para evitar erro de CORS do Google ao enviar muito dado
+                body: JSON.stringify({
+                    acao: 'devolver',
+                    matricula: mat,
+                    sala: salaURL,
+                    relato: relato,
+                    fotoBase64: fotoBase64
+                })
+            });
             Swal.fire('Sucesso', 'Saída registrada!', 'success').then(() => location.reload());
-        }).catch(() => {
-            // Em alguns casos o no-cors dá erro mas salva. Vamos tratar como sucesso se demorar.
-            Swal.fire('Sucesso', 'Saída enviada.', 'success').then(() => location.reload());
-        });
+        } catch(e) {
+            Swal.fire('Erro', 'Tente novamente.', 'error');
+        }
     }
-
-    // (Funções de Reserva e Senha permanecem iguais às anteriores...)
 </script>
 </body>
 </html>
