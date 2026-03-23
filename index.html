@@ -25,6 +25,7 @@
         .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); }
         .nav-semana button { width: auto; padding: 5px 15px; margin: 0; }
         .aviso-qr { color: #666; font-size: 13px; margin: 10px 0; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; }
+        .link-esqueci { display: block; text-align: right; color: var(--azul); font-size: 13px; text-decoration: underline; margin-top: -3px; margin-bottom: 12px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -39,6 +40,9 @@
         <div id="aviso-qr" class="aviso-qr hidden">📍 Central de Reservas<br>Leia o QR Code da porta para registrar entrada.</div>
         <input type="text" id="mat-login" placeholder="Sua Matrícula">
         <input type="password" id="senha-login" placeholder="Sua Senha (PIN)">
+        
+        <span class="link-esqueci" onclick="pedirResetSenha()">Esqueci minha senha</span>
+
         <button id="btn-entrar" onclick="entrar()">ENTRAR NO LAB</button>
         <button style="background:#6c757d; margin-top:15px;" onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
         <button style="background:#ff9800; margin-top:10px;" onclick="trocarSenha()">🔑 ALTERAR MINHA SENHA</button>
@@ -81,12 +85,12 @@
 <script>
     // === CONFIGURAÇÕES GERAIS ===
     const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U";
+    // === COLOQUE O SEU LINK DO APPS SCRIPT AQUI ABAIXO ===
     const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
     
     const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
     const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
     
-    // Leitura do QR Code
     const params = new URLSearchParams(window.location.search);
     const salaURL = params.get('sala');
 
@@ -104,7 +108,6 @@
     const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'], turnos = ['Manhã', 'Tarde', 'Noite'];
     const nomeMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-    // Baixa lista de instrutores ao abrir a página
     window.onload = async () => {
         try {
             const resI = await fetch(`${URL_INSTRUTORES}&t=${Date.now()}`).then(r => r.text());
@@ -164,16 +167,10 @@
         document.getElementById('area-calendario').classList.remove('hidden');
         document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8" style="padding:20px;"><b>Lendo banco de dados...</b></td></tr>';
         
-        // Bloqueador de cache para carregar dados novos da planilha
         fetch(`${API_URL}?acao=getAgenda&sala=${sala}&nocache=${Date.now()}`)
         .then(r => r.json())
-        .then(res => {
-            agendaAtual = res;
-            renderizarGrade();
-        })
-        .catch(e => {
-            document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8" style="color:red;">Erro ao ler agenda.</td></tr>';
-        });
+        .then(res => { agendaAtual = res; renderizarGrade(); })
+        .catch(e => { document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8" style="color:red;">Erro ao ler agenda.</td></tr>'; });
     }
 
     function renderizarGrade() {
@@ -224,7 +221,7 @@
         if (validacao !== "OK") return Swal.fire('Autenticação Falhou', validacao, 'error');
 
         const dr = selecionados.map(s => ({ data: s.split("|")[0], turno: s.split("|")[1] }));
-        Swal.fire({title: 'Gravando na planilha...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Gravando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
         fetch(`${API_URL}?acao=reservar&sala=${sala}&matricula=${mat}&nome=${nome}&reservas=${encodeURIComponent(JSON.stringify(dr))}`)
         .then(r => r.json()).then(res => {
@@ -236,11 +233,11 @@
 
     function cancelarReserva(data, turno) {
         const mat = document.getElementById('res-mat').value, senha = document.getElementById('res-senha').value, sala = document.getElementById('res-sala-sel').value;
-        if (!senha) return Swal.fire('Atenção', 'Digite sua senha no campo acima para desmarcar.', 'warning');
+        if (!senha) return Swal.fire('Atenção', 'Digite sua senha no campo acima.', 'warning');
         const validacao = validarSenha(mat, senha);
         if (validacao !== "OK") return Swal.fire('Acesso Negado', validacao, 'error');
 
-        Swal.fire({ title: 'Alterar / Desmarcar?', text: `Liberar horário do dia ${data} (${turno})?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Sim' }).then(result => {
+        Swal.fire({ title: 'Alterar / Desmarcar?', text: `Liberar o dia ${data}?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Sim' }).then(result => {
             if (result.isConfirmed) {
                 Swal.fire({title: 'Processando...', didOpen: () => Swal.showLoading()});
                 fetch(`${API_URL}?acao=cancelar&sala=${sala}&matricula=${mat}&data=${data}&turno=${turno}`)
@@ -303,6 +300,32 @@
         });
     }
 
+    // === NOVO: PEDIR RESET DE SENHA PARA ADMIN ===
+    function pedirResetSenha() {
+        Swal.fire({
+            title: 'Esqueceu a senha?',
+            text: 'Digite sua matrícula para avisarmos a coordenação:',
+            input: 'text',
+            inputPlaceholder: 'Sua Matrícula',
+            showCancelButton: true,
+            confirmButtonColor: '#005696',
+            confirmButtonText: 'Solicitar Reset',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed && result.value) {
+                Swal.fire({title: 'Avisando coordenação...', didOpen: () => Swal.showLoading()});
+                fetch(`${API_URL}?acao=esqueci_senha&matricula=${result.value}`)
+                .then(r => r.json()).then(res => {
+                    if(res.status === "sucesso") {
+                        Swal.fire('Enviado!', 'A coordenação foi avisada. Em breve sua senha voltará a ser sua matrícula.', 'success');
+                    } else {
+                        Swal.fire('Erro', res.msg, 'error');
+                    }
+                });
+            }
+        });
+    }
+
     function entrar() {
         const mat = document.getElementById('mat-login').value, senha = document.getElementById('senha-login').value;
         if(!mat || !senha) return Swal.fire('Atenção', 'Digite sua matrícula e senha.', 'warning');
@@ -312,7 +335,6 @@
 
         Swal.fire({title: 'Checando porta...', didOpen: () => Swal.showLoading()});
         
-        // Bloqueador de cache para garantir o registro da entrada
         fetch(`${API_URL}?acao=verificar&matricula=${mat}&sala=${salaURL}&nocache=${Date.now()}`)
         .then(r => r.json())
         .then(res => {
@@ -403,21 +425,12 @@
         fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-                acao: 'devolver',
-                matricula: m,
-                sala: salaURL,
-                relato: relato,
-                fotoBase64: fotoBase64
-            })
+            body: JSON.stringify({ acao: 'devolver', matricula: m, sala: salaURL, relato: relato, fotoBase64: fotoBase64 })
         })
         .then(r => r.json())
         .then(res => {
-            if(res.status === "sucesso") {
-                Swal.fire('Saída Registrada', 'Laboratório fechado com sucesso!', 'success').then(() => location.reload());
-            } else {
-                Swal.fire('Aviso', res.msg, 'warning').then(() => location.reload());
-            }
+            if(res.status === "sucesso") Swal.fire('Saída Registrada', 'Laboratório fechado com sucesso!', 'success').then(() => location.reload());
+            else Swal.fire('Aviso', res.msg, 'warning').then(() => location.reload());
         })
         .catch(e => {
             Swal.fire('Comunicação Finalizada', 'Sua solicitação foi processada.', 'success').then(() => location.reload());
