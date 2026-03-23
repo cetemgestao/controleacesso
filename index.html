@@ -25,7 +25,6 @@
         .nav-semana { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: bold; color: var(--azul); }
         .nav-semana button { width: auto; padding: 5px 15px; margin: 0; }
         .aviso-qr { color: #666; font-size: 13px; margin: 10px 0; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; }
-        .link-esqueci { display: block; text-align: right; color: var(--azul); font-size: 13px; text-decoration: underline; margin-top: -3px; margin-bottom: 12px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -41,8 +40,6 @@
         <input type="text" id="mat-login" placeholder="Sua Matrícula">
         <input type="password" id="senha-login" placeholder="Sua Senha (PIN)">
         
-        <span class="link-esqueci" onclick="pedirResetSenha()">Esqueci minha senha</span>
-
         <button id="btn-entrar" onclick="entrar()">ENTRAR NO LAB</button>
         <button style="background:#6c757d; margin-top:15px;" onclick="abrirReserva()">VER AGENDA / RESERVAR</button>
         <button style="background:#ff9800; margin-top:10px;" onclick="trocarSenha()">🔑 ALTERAR MINHA SENHA</button>
@@ -272,8 +269,13 @@
             title: 'Alterar Senha',
             html: `
                 <input type="text" id="swal-mat" class="swal2-input" placeholder="Sua Matrícula">
-                <input type="password" id="swal-senha-atual" class="swal2-input" placeholder="Senha Atual (Padrão é a matrícula)">
-                <input type="password" id="swal-nova-senha" class="swal2-input" placeholder="Nova Senha (Exatamente 6 números)" maxlength="6">
+                <input type="password" id="swal-senha-atual" class="swal2-input" placeholder="Senha Atual (Padrão é a matrícula)" style="margin-bottom: 5px;">
+                
+                <div style="text-align: right; margin-right: 5%; margin-bottom: 10px;">
+                    <span onclick="Swal.close(); setTimeout(pedirResetSenha, 400);" style="color: var(--azul); font-size: 13px; text-decoration: underline; cursor: pointer; font-weight: bold;">Esqueci a senha atual</span>
+                </div>
+                
+                <input type="password" id="swal-nova-senha" class="swal2-input" placeholder="Nova Senha (Exatamente 6 números)" maxlength="6" style="margin-top: 0;">
             `,
             confirmButtonText: 'Trocar Senha',
             confirmButtonColor: '#ff9800',
@@ -300,11 +302,10 @@
         });
     }
 
-    // === NOVO: PEDIR RESET DE SENHA PARA ADMIN ===
     function pedirResetSenha() {
         Swal.fire({
             title: 'Esqueceu a senha?',
-            text: 'Digite sua matrícula para avisarmos a coordenação:',
+            text: 'Digite sua matrícula para avisarmos a equipe de TI:',
             input: 'text',
             inputPlaceholder: 'Sua Matrícula',
             showCancelButton: true,
@@ -313,11 +314,11 @@
             cancelButtonText: 'Cancelar'
         }).then((result) => {
             if (result.isConfirmed && result.value) {
-                Swal.fire({title: 'Avisando coordenação...', didOpen: () => Swal.showLoading()});
+                Swal.fire({title: 'Avisando TI...', didOpen: () => Swal.showLoading()});
                 fetch(`${API_URL}?acao=esqueci_senha&matricula=${result.value}`)
                 .then(r => r.json()).then(res => {
                     if(res.status === "sucesso") {
-                        Swal.fire('Enviado!', 'A coordenação foi avisada. Em breve sua senha voltará a ser sua matrícula.', 'success');
+                        Swal.fire('Enviado!', 'A equipe foi avisada. Em breve sua senha voltará a ser sua matrícula.', 'success');
                     } else {
                         Swal.fire('Erro', res.msg, 'error');
                     }
