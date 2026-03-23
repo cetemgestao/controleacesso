@@ -57,6 +57,7 @@
         </div>
         <input type="text" id="res-nome" placeholder="Nome do Instrutor" style="background:#eee; margin-top:0;" readonly>
         <select id="res-sala-sel" onchange="carregarAgenda()"><option value="">Carregando salas...</option></select>
+        
         <div id="area-calendario" class="hidden">
             <div class="nav-semana">
                 <button onclick="mudarSemana(-1)">&#9664;</button>
@@ -70,6 +71,7 @@
                 </table>
             </div>
         </div>
+        
         <button onclick="enviarReservas()" style="margin-top:15px;">CONFIRMAR AGENDAMENTOS</button>
         <button onclick="gerarRelatorio()" style="background:#673ab7;">📊 RELATÓRIO DE OCUPAÇÃO</button>
         <button style="background:#777" onclick="location.reload()">VOLTAR</button>
@@ -77,13 +79,14 @@
 </div>
 
 <script>
+    // === CONFIGURAÇÕES GERAIS ===
     const PLANILHA_ID = "1J1Jy07-8K6Yj-WshtJTgO5ygBsCoQ3J-CsyDPf2It7U";
-    // MANTENHA A SUA URL AQUI
     const API_URL = "https://script.google.com/macros/s/AKfycbzMYdFmqmiO-pxj1LITaTtJM3XfI8i-D46YQ5WzSyiFrFwbeQkSKnIqttrkCiJ4fXs9/exec";
     
     const URL_SALAS = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Salas_DB`;
     const URL_INSTRUTORES = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Instrutor`;
     
+    // Leitura do QR Code
     const params = new URLSearchParams(window.location.search);
     const salaURL = params.get('sala');
 
@@ -101,6 +104,7 @@
     const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'], turnos = ['Manhã', 'Tarde', 'Noite'];
     const nomeMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
+    // Baixa lista de instrutores ao abrir a página
     window.onload = async () => {
         try {
             const resI = await fetch(`${URL_INSTRUTORES}&t=${Date.now()}`).then(r => r.text());
@@ -118,6 +122,7 @@
         document.getElementById(id).classList.remove('hidden');
     }
 
+    // === VALIDAÇÃO E AGENDA ===
     function validarSenha(matInput, senhaInput) {
         if (listaInstrutores.length === 0) return "Banco carregando, tente de novo em 2 seg.";
         const instrutor = listaInstrutores.find(i => i.mat === matInput);
@@ -159,10 +164,14 @@
         document.getElementById('area-calendario').classList.remove('hidden');
         document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8" style="padding:20px;"><b>Lendo banco de dados...</b></td></tr>';
         
-        fetch(`${API_URL}?acao=getAgenda&sala=${sala}`).then(r => r.json()).then(res => {
+        // Bloqueador de cache para carregar dados novos da planilha
+        fetch(`${API_URL}?acao=getAgenda&sala=${sala}&nocache=${Date.now()}`)
+        .then(r => r.json())
+        .then(res => {
             agendaAtual = res;
             renderizarGrade();
-        }).catch(e => {
+        })
+        .catch(e => {
             document.getElementById('grade-corpo').innerHTML = '<tr><td colspan="8" style="color:red;">Erro ao ler agenda.</td></tr>';
         });
     }
@@ -243,6 +252,24 @@
         });
     }
 
+    function gerarRelatorio() {
+        Swal.fire({title: 'Calculando...', didOpen: () => Swal.showLoading()});
+        const URL_RES_GVIZ = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
+        fetch(`${URL_RES_GVIZ}&t=${Date.now()}`).then(r => r.text()).then(res => {
+            const json = JSON.parse(res.substring(47).slice(0, -2));
+            let sCount = {}, total = 0;
+            json.table.rows.forEach(r => {
+                if (!r.c || !r.c[1] || r.c[1].v === "Sala") return;
+                sCount[r.c[1].v] = (sCount[r.c[1].v] || 0) + 1;
+                total++;
+            });
+            let html = `<p><b>Total:</b> ${total} reservas</p><hr>`;
+            Object.entries(sCount).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(s => html += `• ${s[0]}: ${s[1]}<br>`);
+            Swal.fire({ title: 'Uso dos Labs', html: html, icon: 'info' });
+        });
+    }
+
+    // === SISTEMA DE SENHAS E PORTARIA ===
     function trocarSenha() {
         Swal.fire({
             title: 'Alterar Senha',
@@ -276,23 +303,6 @@
         });
     }
 
-    function gerarRelatorio() {
-        Swal.fire({title: 'Calculando...', didOpen: () => Swal.showLoading()});
-        const URL_RES_GVIZ = `https://docs.google.com/spreadsheets/d/${PLANILHA_ID}/gviz/tq?tqx=out:json&headers=0&sheet=Reservas_DB`;
-        fetch(`${URL_RES_GVIZ}&t=${Date.now()}`).then(r => r.text()).then(res => {
-            const json = JSON.parse(res.substring(47).slice(0, -2));
-            let sCount = {}, total = 0;
-            json.table.rows.forEach(r => {
-                if (!r.c || !r.c[1] || r.c[1].v === "Sala") return;
-                sCount[r.c[1].v] = (sCount[r.c[1].v] || 0) + 1;
-                total++;
-            });
-            let html = `<p><b>Total:</b> ${total} reservas</p><hr>`;
-            Object.entries(sCount).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(s => html += `• ${s[0]}: ${s[1]}<br>`);
-            Swal.fire({ title: 'Uso dos Labs', html: html, icon: 'info' });
-        });
-    }
-
     function entrar() {
         const mat = document.getElementById('mat-login').value, senha = document.getElementById('senha-login').value;
         if(!mat || !senha) return Swal.fire('Atenção', 'Digite sua matrícula e senha.', 'warning');
@@ -301,12 +311,17 @@
         if (validacao !== "OK") return Swal.fire('Acesso Negado', validacao, 'error');
 
         Swal.fire({title: 'Checando porta...', didOpen: () => Swal.showLoading()});
-        fetch(`${API_URL}?acao=verificar&matricula=${mat}&sala=${salaURL}`).then(r => r.json()).then(res => {
+        
+        // Bloqueador de cache para garantir o registro da entrada
+        fetch(`${API_URL}?acao=verificar&matricula=${mat}&sala=${salaURL}&nocache=${Date.now()}`)
+        .then(r => r.json())
+        .then(res => {
             if(res.status === "sucesso" || res.status === "ja_logado") { mostrar('tela-devolucao'); Swal.close(); }
             else { Swal.fire('Acesso Negado', res.msg, 'error'); }
         });
     }
 
+    // === DEVOLUÇÃO COM FOTO E PROTEÇÃO DUPLA ===
     function comprimirFoto(file, callback) {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -381,7 +396,6 @@
         });
     }
 
-    // === PROCESSA A SAÍDA COM PROTEÇÃO DE REFRESH ===
     function processarSaida(relato, fotoBase64) {
         const m = document.getElementById('mat-login').value;
         Swal.fire({title: 'Registrando saída...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
@@ -402,12 +416,10 @@
             if(res.status === "sucesso") {
                 Swal.fire('Saída Registrada', 'Laboratório fechado com sucesso!', 'success').then(() => location.reload());
             } else {
-                // Se cair aqui, é porque o backend avisou "Você já deu saída antes!"
                 Swal.fire('Aviso', res.msg, 'warning').then(() => location.reload());
             }
         })
         .catch(e => {
-            // Se a internet piscar no último segundo, força a saída da tela pra não duplicar click
             Swal.fire('Comunicação Finalizada', 'Sua solicitação foi processada.', 'success').then(() => location.reload());
         });
     }
