@@ -396,7 +396,7 @@
         const validacao = validarSenha(mat, senha);
         if (validacao !== "OK") return Swal.fire('Acesso Negado', validacao, 'error');
 
-        Swal.fire({title: 'Checando porta...', didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Checando Reserva...', didOpen: () => Swal.showLoading()});
         
         fetch(`${API_URL}?acao=verificar&matricula=${mat}&sala=${salaURL}&nocache=${Date.now()}`)
         .then(r => r.json())
