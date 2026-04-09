@@ -111,9 +111,10 @@
             const resI = await fetch(`${URL_INSTRUTORES}&t=${Date.now()}`).then(r => r.text());
             const jI = JSON.parse(resI.substring(47).slice(0, -2));
             listaInstrutores = jI.table.rows.map(r => ({ 
-                mat: r.c[0]?.v?.toString() || "", 
-                nome: r.c[1]?.v || "",
-                senha: r.c[2]?.v?.toString() || r.c[0]?.v?.toString() 
+                // O .trim() aqui limpa os espaços acidentais da planilha
+                mat: r.c[0]?.v?.toString().trim() || "", 
+                nome: r.c[1]?.v?.toString().trim() || "",
+                senha: r.c[2]?.v?.toString().trim() || r.c[0]?.v?.toString().trim() 
             }));
         } catch(e) { console.log("Aguardando carregamento..."); }
     };
@@ -126,9 +127,14 @@
     // === VALIDAÇÃO E AGENDA ===
     function validarSenha(matInput, senhaInput) {
         if (listaInstrutores.length === 0) return "Banco carregando, tente de novo em 2 seg.";
-        const instrutor = listaInstrutores.find(i => i.mat === matInput);
+        
+        // O .trim() aqui limpa os espaços que o teclado do celular coloca sozinho
+        const matLimpa = matInput.toString().trim();
+        const senhaLimpa = senhaInput.toString().trim();
+
+        const instrutor = listaInstrutores.find(i => i.mat === matLimpa);
         if (!instrutor) return "Matrícula não encontrada.";
-        if (instrutor.senha !== senhaInput) return "Senha incorreta.";
+        if (instrutor.senha !== senhaLimpa) return "Senha incorreta.";
         return "OK";
     }
 
