@@ -184,6 +184,12 @@
     function renderizarGrade() {
         const cor = document.getElementById('grade-corpo');
         const matAtual = document.getElementById('res-mat').value.trim();
+        
+        // --- 1. CONFIGURAÇÃO DOS SUPER USUÁRIOS ---
+        // Coloque aqui as matrículas que terão poder de deletar a reserva de todos
+        const admins = ["1000990", "501291"]; 
+        const ehAdmin = admins.includes(matAtual);
+
         let dSemana = [], hCor = '';
         
         for(let i=0; i<7; i++) {
@@ -205,16 +211,22 @@
                 const selCanc = cancelamentos.includes(idCelula);
                 
                 if (reserva) {
-                    if (matAtual && reserva.matricula === matAtual) {
-                        // Se for do instrutor e ele marcou para excluir:
+                    // --- 2. A MÁGICA ACONTECE AQUI ---
+                    // Libera se a reserva for da própria pessoa OU se for um usuário Master (Admin)
+                    if (matAtual && (reserva.matricula === matAtual || ehAdmin)) {
+                        
+                        // Se for a sua reserva, mostra "MINHA". Se você for Admin vendo a de outro, mostra "ADMIN"
+                        let textoOrigem = (reserva.matricula === matAtual) ? "MINHA" : "ADMIN";
+
+                        // Se já marcou para excluir:
                         if (selCanc) {
                             hCor += `<td class="celula-selecionada" style="background:#ff9800 !important; color:white; font-weight:bold; cursor:pointer; text-decoration:line-through;" onclick="clicarCancelar('${idCelula}')" title="Desfazer">REMOVER</td>`;
                         } else {
-                            // Se for do instrutor e estiver normal (Verde claro para destacar das outras ocupadas)
-                            hCor += `<td class="celula-ocupada" style="background:#d4edda; color:#155724; border: 2px solid #28a745; cursor:pointer;" onclick="clicarCancelar('${idCelula}')" title="Clique para Remover">MINHA<br>${reserva.instrutor}</td>`;
+                            // Se estiver normal (Verde claro indicando que pode clicar para remover)
+                            hCor += `<td class="celula-ocupada" style="background:#d4edda; color:#155724; border: 2px solid #28a745; cursor:pointer;" onclick="clicarCancelar('${idCelula}')" title="Clique para Remover">${textoOrigem}<br>${reserva.instrutor}</td>`;
                         }
                     } else {
-                        // Se for de outro instrutor
+                        // Se for de outro instrutor e você NÃO for admin (Célula Bloqueada)
                         hCor += `<td class="celula-ocupada">X<br>${reserva.instrutor}</td>`;
                     }
                 } else if (selRes) {
@@ -343,7 +355,7 @@
                     <span onclick="Swal.close(); setTimeout(pedirResetSenha, 400);" style="color: var(--azul); font-size: 14px; text-decoration: underline; cursor: pointer; font-weight: bold;">Esqueci a senha atual</span>
                 </div>
                 
-                <input type="password" id="swal-nova-senha" class="swal2-input" placeholder="Nova(Exatamente 6 números)" maxlength="6" style="margin-top: 0;">
+                <input type="password" id="swal-nova-senha" class="swal2-input" placeholder="Nova(6 números)" maxlength="6" style="margin-top: 0;">
             `,
             confirmButtonText: 'Trocar Senha',
             confirmButtonColor: '#ff9800',
